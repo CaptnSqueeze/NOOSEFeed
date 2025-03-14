@@ -1,7 +1,10 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\public",
+    "\\src",
+    "\\src\\assets"
   ],
-  "SelectedNode": "\\index.html",
+  "SelectedNode": "\\todo.txt",
   "PreviewInSolutionExplorer": false
 }

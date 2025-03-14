@@ -1,0 +1,45 @@
+[
+    {
+        "category": "News - Canada",
+        "feeds": [
+            {
+                "title": "CBC",
+                "link": "https://www.cbc.ca/cmlink/rss-topstories"
+            },
+            {
+                "title": "Global News",
+                "link": "https://globalnews.ca/pages/feeds/"
+            },
+            {
+                "title": "Toronto Star",
+                "link": "https://www.thestar.com/content/thestar/feed.RSSManagerServlet.articles.topstories.rss"
+            }
+        ]
+    },
+    {
+        "category": "News - World",
+        "feeds": [
+            {
+                "title": "BBC",
+                "link": "http://feeds.bbci.co.uk/news/world/rss.xml"
+            },
+            {
+                "title": "Washington Post",
+                "link": "http://feeds.washingtonpost.com/rss/world"
+            },
+            {
+                "title": "The Guardian",
+                "link": "https://www.theguardian.com/world/rss"
+            }
+        ]
+    },
+    {
+        "category": "Business and Economy",
+        "feeds": [
+            {
+                "title": "CNBC",
+                "link": "https://www.cnbc.com/id/100003114/device/rss/rss.html"
+            }
+        ]
+    }
+]
