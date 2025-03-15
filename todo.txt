@@ -5,18 +5,20 @@
 > features implemented:
 	> function to read the time (date is not super useful i think that can be removed?)
 	> load 20 first entries and load 20 more each scroll
+	> time since article posted instead of pubDate
 	> change link to display article summary / description
+	> sort article by time published instead of by source
+	> design work - figure out if user is on mobile and adapt design
+	> function to cut the description or to fit it inside a box
 
 > features to implement:
-	> function to cut the description or to fit it inside a box?
-	> design work - figure out if user is on mobile and adapt design
-	> some function to scrape / load the article text
-	> sort article by time published instead of by source
-	> time appears to be incorrect? who tf knows?
-
+	> fix Git repo and instructions to run locally / contribute
+	> some function to scrape / display the full article text from the ArticlePage
+	> filter by source, filter by category
+	> login / register / save preferences
+	
 > broken:
-	> times are all fucked up
-	> wapo and bbc aren't getting thumbnails
+	> nothing?
 
 push build to server:
 unix cli:	sudo chown -R jacques:jacques /var/www/html

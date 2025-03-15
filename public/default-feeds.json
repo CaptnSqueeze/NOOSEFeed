@@ -8,11 +8,27 @@
             },
             {
                 "title": "Global News",
-                "link": "https://globalnews.ca/pages/feeds/"
+                "link": "https://globalnews.ca/canada/feed/"
             },
             {
                 "title": "Toronto Star",
-                "link": "https://www.thestar.com/content/thestar/feed.RSSManagerServlet.articles.topstories.rss"
+                "link": "https://www.thestar.com/search/?f=rss&t=article&c=news/canada*&l=50&s=start_time&sd=desc"
+            },
+            {
+                "title": "National Post",
+                "link": "https://nationalpost.com/feed/"
+            },
+            {
+                "title": "Ottawa Citizen",
+                "link": "https://ottawacitizen.com/feed/"
+            },
+            {
+                "title": "LaPresse",
+                "link": "https://www.lapresse.ca/actualites/rss"
+            },
+            {
+                "title": "Toronto Sun",
+                "link": "https://torontosun.com/category/news/feed"
             }
         ]
     },
@@ -30,6 +46,30 @@
             {
                 "title": "The Guardian",
                 "link": "https://www.theguardian.com/world/rss"
+            },
+            {
+                "title": "Toronto Star",
+                "link": "https://www.thestar.com/search/?f=rss&t=article&c=news/world*&l=50&s=start_time&sd=desc"
+            },
+            {
+                "title": "r/Worldnews",
+                "link": "https://www.reddit.com/r/worldnews/.rss"
+            },
+            {
+                "title": "New York Times",
+                "link": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+            },
+            {
+                "title": "CNBC",
+                "link": "http://rss.cnn.com/rss/edition_world.rss"
+            },
+            {
+                "title": "Yahoo News",
+                "link": "https://www.yahoo.com/news/rss"
+            },
+            {
+                "title": "Google News",
+                "link": "https://news.google.com/rss"
             }
         ]
     },
@@ -39,6 +79,39 @@
             {
                 "title": "CNBC",
                 "link": "https://www.cnbc.com/id/100003114/device/rss/rss.html"
+            },
+            {
+                "title": "Toronto Star",
+                "link": "https://www.thestar.com/search/?f=rss&t=article&c=business*&l=50&s=start_time&sd=desc"
+            },
+            {
+                "title": "Financial Post",
+                "link": "https://business.financialpost.com/feed/"
+            },
+            {
+                "title": "Fortune",
+                "link": "https://fortune.com/feed"
+            },
+            {
+                "title": "Business Standard",
+                "link": "https://www.business-standard.com/rss/home_page_top_stories.rssd"
+            }
+        ]
+    },
+    {
+        "category": "Funny",
+        "feeds": [
+            {
+                "title": "XKCD",
+                "link": "https://xkcd.com/rss.xml"
+            },
+            {
+                "title": "The Onion",
+                "link": "https://www.theonion.com/rss"
+            },
+            {
+                "title": "The Beaverton",
+                "link": "https://www.thebeaverton.com/feed"
             }
         ]
     }

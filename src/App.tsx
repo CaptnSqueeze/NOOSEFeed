@@ -1,7 +1,69 @@
-import { useEffect, useState} from "react";
+// App.tsx
+import { formatDistanceToNow, parseISO } from 'date-fns';
+import { useEffect, useState, useRef } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import ArticlePage from "./ArticlePage.tsx";
 import './index.css';
+import { getBestImageForFeedItem } from './ImageExtractor';
+
+
+const LoadingSpinner = () => {
+    return (
+        <div className="flex justify-center items-center p-4 bg-gray-900 w-full">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+    );
+};
+
+function formatTimeAgo(pubDateStr: string): string {
+    try {
+        // Print raw string for debugging
+        // console.log("Raw pubDate string:", pubDateStr);
+
+        // Try to parse the date - first attempt with native Date
+        let pubDate = new Date(pubDateStr);
+
+        // Check if the date is valid
+        if (isNaN(pubDate.getTime())) {
+            // If not valid, try to clean up the string and parse again
+            // RSS feeds often have non-standard formats
+            const cleanDateStr = pubDateStr.replace(/[A-Za-z]{3},\s/, '').trim();
+            pubDate = new Date(cleanDateStr);
+
+            if (isNaN(pubDate.getTime())) {
+                return "Unknown date";
+            }
+        }
+
+        // For debugging - log parsed date and current time
+        // console.log("Parsed pubDate:", pubDate);
+        // console.log("Current time:", new Date());
+
+        // For dates older than a week, return the formatted date
+        const now = new Date();
+        const diffDays = Math.floor((now.getTime() - pubDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays > 6) {
+            return pubDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        }
+
+        // Calculate manually for more accurate relative time
+        const timeDiff = now.getTime() - pubDate.getTime();
+        const minutes = Math.floor(timeDiff / (1000 * 60));
+        const hours = Math.floor(minutes / 60);
+
+        if (hours > 0) {
+            return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+        } else if (minutes > 0) {
+            return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+        } else {
+            return 'just now';
+        }
+    } catch (error) {
+        console.error("Error formatting date:", error);
+        return "Unknown date";
+    }
+}
 
 const ITEMS_PER_PAGE = 20; // Number of items to load at a time
 
@@ -11,7 +73,7 @@ const Banner = () => {
             <img src="logo.png" alt="Logo" className="h-8 md:h-12 mr-4" />
             <div className="flex flex-col ml-auto text-right">
                 <h1 className="text-lg md:text-2xl font-bold">Welcome to NOOSEFeed</h1>
-                <h2 className="text-xs md:text-sm font-bold">no paywalls, no algorithms... just news</h2>
+                <h2 className="text-xs md:text-sm font-bold">no app, no paywalls, no algorithms... just news</h2>
             </div>
         </div>
     );
@@ -32,49 +94,62 @@ export interface FeedItem {
     source: string; // Source is the title of the feed (e.g., "CBC", "BBC")
     category: string; // Category (e.g., "News - Canada")
     pubDate: string;  // Publication date of the article
+    timeAgo: string;
     imageUrl?: string | null;
 }
 
 const FeedItemComponent = ({ title, description, source, category, pubDate, imageUrl }: FeedItem) => {
-    const slug = slugify(title); // Generate slug from title
+    const slug = slugify(title);
 
-    // Clean the description by removing HTML tags, handling </p><p> properly, and cleaning extra dots
+    // clean the description by removing html tags, etc
     const cleanDescription = description
         .replace("Continue reading...", "")
-        .replace(/<\/p><p>/g, ". ")   // Replace paragraph breaks with a period and space
-        .replace(/<\/?[^>]+(>|$)/g, "") // Remove all HTML tags
-        .replace(/\.{2,}/g, ".")       // Replace consecutive dots with a single dot
-        .trim();  // Trim any leading/trailing whitespace
+        .replace(/<\/p><p>/g, ". ")
+        .replace(/<\/?[^>]+(>|$)/g, "")
+        .replace(/\.{2,}/g, ".")
+        .replace("&#8217;", "'")
+        .replace("&#8212;", "-")
+        .trim();
 
-    // Truncate description for mobile devices
-    const truncatedDescription = cleanDescription.length > 50 ? cleanDescription.substring(0, 50) + "..." : cleanDescription;
+    const truncatedDescription = cleanDescription.length > 70
+        ? cleanDescription.substring(0, 40) + "..."
+        : cleanDescription;
 
-    // responsible for rendering the UI of a single feed item
+    // Format timeAgo here
+    const timeAgo = pubDate ? formatTimeAgo(pubDate) : "Unknown";
+
     return (
-        <div className="bg-gray-800 p-2 md:p-4 rounded-lg shadow-md hover:shadow-xl transition-shadow w-full">
-            <Link to={`/articles/${slug}`} className="flex flex-row gap-2 md:gap-4 hover:no-underline">
-                {imageUrl && (
-                    <div className="flex-shrink-0 flex items-center">
+        <div className="bg-gray-800 p-2 md:p-4 rounded-lg shadow-md hover:shadow-xl transition-shadow w-full h-24 md:h-44">
+            <Link to={`/articles/${slug}`} className="flex flex-row gap-2 md:gap-4 hover:no-underline h-full">
+                {/* Image container with fixed size */}
+                <div className="flex-shrink-0 w-20 h-20 md:w-36 md:h-36 self-start" style={{ marginTop: "0.25rem" }}>
+                    {imageUrl ? (
                         <img
                             src={imageUrl}
                             alt={title}
-                            className="w-16 h-16 md:w-32 md:h-32 object-cover rounded"
+                            className="w-full h-full object-cover rounded"
                             onError={(e) => (e.currentTarget.style.display = 'none')}
                         />
-                    </div>
-                )}
-                <div className="flex-grow flex flex-col justify-between">
-                    <div>
-                        <h3 className="font-semibold text-xs md:text-lg text-white mb-1 md:mb-2">
+                    ) : (
+                        <div className="w-full h-full bg-gray-700 rounded flex items-center justify-center">
+                            <span className="text-gray-500 text-xs">No image</span>
+                        </div>
+                    )}
+                </div>
+                {/* Content container with fixed layout */}
+                <div className="flex-grow flex flex-col justify-between h-full overflow-hidden">
+                    <div className="overflow-hidden">
+                        <h3 className="font-semibold text-sm md:text-lg text-white mb-1 md:mb-2">
                             {title}
                         </h3>
-                        <p className="text-xs text-gray-300 mb-1 md:mb-2 md:line-clamp-none line-clamp-3">
-                            <span className="block md:hidden">{truncatedDescription}</span>
-                            <span className="hidden md:block">{cleanDescription}</span>
+                        {/* Different description handling for mobile vs desktop */}
+                        <p className="text-xs text-gray-300">
+                            <span className="block md:hidden line-clamp-1">{truncatedDescription}</span>
+                            <span className="hidden md:block overflow-auto max-h-20">{cleanDescription}</span>
                         </p>
                     </div>
-                    <div className="text-xs text-gray-500 italic">
-                        <p>{category} | {source} | {pubDate}</p>
+                    <div className="text-xs text-gray-500 italic mt-auto">
+                        <p>{category} | {source} | {timeAgo}</p>
                     </div>
                 </div>
             </Link>
@@ -88,8 +163,13 @@ function App() {
     const [visibleFeedItems, setVisibleFeedItems] = useState<FeedItem[]>([]);
     const [loadedItems, setLoadedItems] = useState(0);
     const [scrollPositions, setScrollPositions] = useState<{ [key: string]: number }>({});
+    const [initialHomeRender, setInitialHomeRender] = useState(true);
+    const [contentVisible, setContentVisible] = useState(false);
     const location = useLocation();
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    // Add this ref to track if we've already scrolled for the current article page view
+    const hasScrolledToTop = useRef(false);
 
     // Save scroll position when navigating away
     useEffect(() => {
@@ -116,7 +196,6 @@ function App() {
     }, [location.pathname, visibleFeedItems]);
 
     useEffect(() => {
-
         // Check if the app is running locally or in production
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
@@ -130,9 +209,10 @@ function App() {
 
         fetch("/default-feeds.json")
             .then((response) => response.json())
-            // Modify your existing code to extract images
             .then((data) => {
                 let feedItemsArray: FeedItem[] = [];
+                let pendingImageFetches: Promise<void>[] = [];
+
                 data.forEach((category: { category: string; feeds: Feed[] }) => {
                     category.feeds.forEach((feed: Feed) => {
                         const feedUrl = feed.link;
@@ -143,65 +223,56 @@ function App() {
                                 const parser = new DOMParser();
                                 const xmlDoc = parser.parseFromString(xmlData, "application/xml");
                                 const items = xmlDoc.querySelectorAll("item");
+
                                 items.forEach((item) => {
                                     const title = item.querySelector("title")?.textContent;
                                     const link = item.querySelector("link")?.textContent;
                                     const description = item.querySelector("description")?.textContent;
                                     const pubDate = item.querySelector("pubDate")?.textContent;
 
-                                    // Extract image URL using multiple methods
-                                    let imageUrl = null;
-
-                                    // Method 1: Look for media:content element
-                                    const mediaContent = item.querySelector("media\\:content, content");
-                                    if (mediaContent && mediaContent.getAttribute("url")) {
-                                        imageUrl = mediaContent.getAttribute("url");
-                                    }
-
-                                    // Method 2: Look for enclosure with image type
-                                    if (!imageUrl) {
-                                        const enclosure = item.querySelector("enclosure");
-                                        if (enclosure &&
-                                            enclosure.getAttribute("type")?.startsWith("image/") &&
-                                            enclosure.getAttribute("url")) {
-                                            imageUrl = enclosure.getAttribute("url");
-                                        }
-                                    }
-
-                                    // Method 3: Parse image from description HTML
-                                    if (!imageUrl && description) {
-                                        const tempDiv = document.createElement('div');
-                                        tempDiv.innerHTML = description;
-                                        const img = tempDiv.querySelector('img');
-                                        if (img && img.src) {
-                                            imageUrl = img.src;
-                                        }
-                                    }
-
-                                    // Method 4: Look for image tag within item
-                                    if (!imageUrl) {
-                                        const itemImage = item.querySelector("image");
-                                        if (itemImage && itemImage.querySelector("url")) {
-                                            imageUrl = itemImage.querySelector("url")?.textContent || null;
-                                        }
-                                    }
-
                                     if (title && link && description && pubDate) {
-                                        feedItemsArray.push({
+                                        // Create a feed item without an image initially
+                                        const feedItem: FeedItem = {
                                             title,
                                             link,
                                             description,
                                             source: feed.title,
                                             category: category.category,
-                                            pubDate: new Date(pubDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                                            imageUrl: imageUrl, // Add the image URL to your feed item
-                                        });
+                                            pubDate: pubDate,
+                                            timeAgo: formatTimeAgo(pubDate),
+                                            imageUrl: null, // Will be populated later
+                                        };
+
+                                        // Add to array immediately (without image)
+                                        feedItemsArray.push(feedItem);
+
+                                        // Create a promise to fetch the image
+                                        const imagePromise = getBestImageForFeedItem(item, feed.title, true)
+                                            .then(imageUrl => {
+                                                // Update the feed item with the image URL
+                                                feedItem.imageUrl = imageUrl;
+                                            })
+                                            .catch(error => {
+                                                console.error(`Error getting image for ${title}:`, error);
+                                            });
+
+                                        pendingImageFetches.push(imagePromise);
                                     }
                                 });
-                                // Once all feed items are fetched, update state
-                                setAllFeedItems(feedItemsArray);
-                                setVisibleFeedItems(feedItemsArray.slice(0, ITEMS_PER_PAGE)); // Load first batch
-                                setLoadedItems(ITEMS_PER_PAGE);
+
+                                // Wait for all image fetches to complete before updating state
+                                Promise.allSettled(pendingImageFetches).then(() => {
+                                    // Sort by date if needed (most recent first)
+                                    feedItemsArray.sort((a, b) => {
+                                        const dateA = new Date(a.pubDate);
+                                        const dateB = new Date(b.pubDate);
+                                        return dateB.getTime() - dateA.getTime();
+                                    });
+
+                                    setAllFeedItems(feedItemsArray);
+                                    setVisibleFeedItems(feedItemsArray.slice(0, ITEMS_PER_PAGE));
+                                    setLoadedItems(ITEMS_PER_PAGE);
+                                });
                             })
                             .catch((error) => console.error("Error loading RSS feed:", error));
                     });
@@ -219,14 +290,57 @@ function App() {
     };
 
     // Scroll event listener to trigger `loadMoreItems`
+    // Modify your scroll handling effect
     useEffect(() => {
+        //console.log("Current path:", location.pathname);
+
         if (location.pathname === '/') {
-            // Increase timeout slightly to ensure DOM is ready
-            setTimeout(() => {
-                window.scrollTo(0, scrollPositions['/'] || 0);
-            }, 200);
+            // Reset the scroll flag when going to home
+            hasScrolledToTop.current = false;
+
+            // Your existing home page logic...
+            if (!initialHomeRender) {
+                setContentVisible(false);
+
+                setTimeout(() => {
+                    const savedPosition = scrollPositions['/'] || 0;
+                    //console.log("Restoring home scroll to:", savedPosition);
+                    window.scrollTo(0, savedPosition);
+
+                    setTimeout(() => {
+                        setContentVisible(true);
+                    }, 50);
+                }, 10);
+            } else {
+                setContentVisible(true);
+                setInitialHomeRender(false);
+            }
+        } else if (location.pathname.includes('/articles/')) {
+            // For article pages - always show content
+            setContentVisible(true);
+
+            // Only scroll if we haven't already for this view
+            if (!hasScrolledToTop.current) {
+                //console.log("Article page detected - forcing scroll to top with delay");
+
+                // Use a more reliable approach with RAF and timeout
+                setTimeout(() => {
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'instant' // Use 'instant' instead of smooth for more reliable positioning
+                    });
+                    hasScrolledToTop.current = true;
+                }, 100);
+            }
         }
-    }, [location.pathname, scrollPositions]);
+
+        // Cleanup function to reset the scroll flag when unmounting
+        return () => {
+            if (location.pathname.includes('/articles/')) {
+                hasScrolledToTop.current = false;
+            }
+        };
+    }, [location.pathname, scrollPositions, initialHomeRender]);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -243,19 +357,24 @@ function App() {
         };
     }, [loadedItems, allFeedItems]);
 
-
-
     return (
         <div className="flex flex-col min-h-screen">
             <Banner />
             <Routes>
                 <Route path="/" element={
                     <div className="bg-gray-900 p-0 md:p-6 min-h-screen w-full">
-                        <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-0 md:gap-6">
+                        {/* Main content */}
+                        <div className={`grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-0 md:gap-6 ${contentVisible ? '' : 'opacity-0'}`}
+                            style={{ transition: "opacity 0.2s ease-in-out" }}>
                             {visibleFeedItems.map((item, index) => (
                                 <FeedItemComponent key={index} {...item} />
                             ))}
                         </div>
+
+                        {/* Loading spinner - shown when there are more items to load */}
+                        {loadedItems < allFeedItems.length && (
+                            <LoadingSpinner />
+                        )}
                     </div>
                 } />
                 <Route path="/articles/:slug" element={<ArticlePage feedItems={allFeedItems} isLocal={isLocal} />} />

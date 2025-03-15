@@ -11,6 +11,7 @@
         "build:css": "tailwindcss -i ./src/index.css -o ./dist/styles.css"
     },
     "dependencies": {
+        "date-fns": "^4.1.0",
         "postcss-cli": "^11.0.1",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
