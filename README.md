@@ -4,8 +4,6 @@
 
 NOOSEFeed is a lightweight news aggregator that displays content from various RSS feeds in a clean, ad-free interface. The application fetches RSS feeds directly, extracts images, and presents articles in a unified, chronological format.
 
-![NOOSEFeed Banner](public/logo.png)
-
 ## Features
 
 - Clean, distraction-free reading experience
