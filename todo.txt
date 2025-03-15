@@ -1,6 +1,6 @@
 > server should run /var/www/html/proxy 'sudo node cors-proxy.js' to proxy requests to rss feeds
 
-> for running locally, go to https://cors-anywhere.herokuapp.com/ and request temporary access to the dev server
+> for running locally, run 'npm run dev' and go to https://cors-anywhere.herokuapp.com/ and request temporary access to the dev server
 
 > features implemented:
 	> function to read the time (date is not super useful i think that can be removed?)
@@ -14,8 +14,16 @@
 	> sort article by time published instead of by source
 	> time appears to be incorrect? who tf knows?
 
+> broken:
+	> times are all fucked up
+	> wapo and bbc aren't getting thumbnails
+
 push build to server:
 unix cli:	sudo chown -R jacques:jacques /var/www/html
 CMD:		scp -r dist/* jacques@192.168.2.38:/var/www/html
 unix cli:	sudo chown -R www-data:www-data /var/www/html
 
+
+to keep running cors-proxy.js even if terminal window closes, use: sudo nohup node cors-proxy.js > output.log 2>&1 &
+>> output.log will be in /var/www/html/proxy 
+>> make this run on system reboot at some point... 
