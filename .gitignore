@@ -90,5 +90,5 @@ Desktop.ini
 # Cache files
 .cache/
 
-# JavaScript files
-*.js
+# JavaScript files that are compiled automatically
+/src/*.js
