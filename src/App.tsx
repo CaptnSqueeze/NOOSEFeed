@@ -55,7 +55,7 @@ function formatTimeAgo(pubDateStr: string): string {
         if (hours > 0) {
             return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
         } else if (minutes > 0) {
-            return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+            return minutes === 1 ? '1m' : `${minutes}m`;
         } else {
             return 'just now';
         }
@@ -109,6 +109,7 @@ const FeedItemComponent = ({ title, description, source, category, pubDate, imag
         .replace(/\.{2,}/g, ".")
         .replace("&#8217;", "'")
         .replace("&#8212;", "-")
+        .replace("&#8230;", "...")
         .trim();
 
     const truncatedDescription = cleanDescription.length > 70

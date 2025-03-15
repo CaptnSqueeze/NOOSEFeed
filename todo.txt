@@ -18,7 +18,7 @@
 	> login / register / save preferences
 	
 > broken:
-	> nothing?
+	> wait until everything is loaded to display articles on the main page? maybe not the pictures
 
 push build to server:
 unix cli:	sudo chown -R jacques:jacques /var/www/html

@@ -131,6 +131,9 @@ const ArticlePage = ({ feedItems, isLocal }: { feedItems: FeedItem[]; isLocal: b
         .replace(/<\/p><p>/g, ". ")
         .replace(/<\/?[^>]+(>|$)/g, "")
         .replace(/\.{2,}/g, ".")
+        .replace("&#8217;", "'")
+        .replace("&#8212;", "-")
+        .replace("&#8230;", "...")
         .trim();
 
     // Use high-quality image if available, otherwise fall back to RSS image
