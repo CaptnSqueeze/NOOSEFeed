@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react
 import ArticlePage from "./ArticlePage.tsx";
 import './index.css';
 import { getBestImageForFeedItem } from './ImageExtractor';
+import VisitorLogger from './components/VisitorLogger';
 
 
 // Enhanced LoadingSpinner with fullscreen overlay option
@@ -114,7 +115,7 @@ const ITEMS_PER_PAGE = 20; // Number of items to load at a time
 
 const Banner = () => {
     return (
-        <div className="bg-gray-950 text-white p-2.5 flex items-center justify-between md:justify-start">
+        <div className="bg-blue-900 text-white p-2.5 flex items-center justify-between md:justify-start">
             <img src="logo2.png" alt="Logo" className="h-11 md:h-14 mr-4" />
             <div className="flex flex-col text-right md:text-left md:ml-0">
                 <h1 className="text-lg md:text-2xl font-bold">Welcome to NOOSEFeed</h1>
@@ -439,6 +440,7 @@ function App() {
 
    return (
         <div className="flex flex-col min-h-screen">
+        <VisitorLogger />
             {/* Full-screen loading overlay */}
             {isLoading && <LoadingSpinner fullscreen={true} />}
             

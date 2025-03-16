@@ -12,6 +12,7 @@
 	> function to cut the description or to fit it inside a box
 
 > features to implement:
+	> log unique visitors (IP, date, time, user agent)
 	> fix Git repo and instructions to run locally / contribute
 	> some function to scrape / display the full article text from the ArticlePage
 	> filter by source, filter by category
@@ -26,7 +27,11 @@ unix cli:	sudo chown -R jacques:jacques /var/www/html
 CMD:		scp -r dist/* jacques@192.168.2.38:/var/www/html
 unix cli:	sudo chown -R www-data:www-data /var/www/html
 
-
-to keep running cors-proxy.js even if terminal window closes, use: sudo nohup node cors-proxy.js > output.log 2>&1 &
->> output.log will be in /var/www/html/proxy 
->> make this run on system reboot at some point... 
+to run the proxy server in tmux:
+	cd /var/www/html/proxy
+	tmux new -s proxy-server
+	sudo node cors-proxy.js
+to detach from the session: 
+	Ctrl+b, then d 
+to check on it: 
+	tmux attach -t proxy-server
