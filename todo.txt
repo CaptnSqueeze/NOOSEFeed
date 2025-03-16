@@ -10,17 +10,16 @@
 	> sort article by time published instead of by source
 	> design work - figure out if user is on mobile and adapt design
 	> function to cut the description or to fit it inside a box
+	> log unique visitors (IP, date, time, user agent)
+	> function to scrape / display the full article text from the ArticlePage
 
 > features to implement:
-	> log unique visitors (IP, date, time, user agent)
 	> fix Git repo and instructions to run locally / contribute
-	> some function to scrape / display the full article text from the ArticlePage
 	> filter by source, filter by category
 	> login / register / save preferences
 	
 > broken:
-	> wait until everything is loaded to display articles on the main page? maybe not the pictures.. 
-	...or maybe load the first 20 pictures first after sorting by when everything was published?
+	> fix time on ArticlePage to be in the user's timezone
 
 push build to server:
 unix cli:	sudo chown -R jacques:jacques /var/www/html
