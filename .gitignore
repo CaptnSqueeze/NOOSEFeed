@@ -92,3 +92,4 @@ Desktop.ini
 
 # JavaScript files that are compiled automatically
 /src/*.js
+/proxy/*
