@@ -18,7 +18,8 @@
 	> login / register / save preferences
 	
 > broken:
-	> wait until everything is loaded to display articles on the main page? maybe not the pictures
+	> wait until everything is loaded to display articles on the main page? maybe not the pictures.. 
+	...or maybe load the first 20 pictures first after sorting by when everything was published?
 
 push build to server:
 unix cli:	sudo chown -R jacques:jacques /var/www/html

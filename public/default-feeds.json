@@ -66,10 +66,6 @@
             {
                 "title": "Yahoo News",
                 "link": "https://www.yahoo.com/news/rss"
-            },
-            {
-                "title": "Google News",
-                "link": "https://news.google.com/rss"
             }
         ]
     },

@@ -1,4 +1,5 @@
-// App.tsx
+// App.tsx - fixed implementation
+
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { useEffect, useState, useRef } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
@@ -7,7 +8,19 @@ import './index.css';
 import { getBestImageForFeedItem } from './ImageExtractor';
 
 
-const LoadingSpinner = () => {
+// Enhanced LoadingSpinner with fullscreen overlay option
+const LoadingSpinner = ({ fullscreen = false }) => {
+    if (fullscreen) {
+        return (
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-80 flex justify-center items-center z-50">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
+                    <p className="text-white mt-4 font-semibold">Loading NOOSEFeed...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex justify-center items-center p-4 bg-gray-900 w-full">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
@@ -20,40 +33,71 @@ function formatTimeAgo(pubDateStr: string): string {
         // Print raw string for debugging
         // console.log("Raw pubDate string:", pubDateStr);
 
-        // Try to parse the date - first attempt with native Date
-        let pubDate = new Date(pubDateStr);
+        // First, try to extract timezone information if present
+        let pubDate: Date;
+        let originalTimezoneOffset: number | null = null;
 
-        // Check if the date is valid
-        if (isNaN(pubDate.getTime())) {
-            // If not valid, try to clean up the string and parse again
-            // RSS feeds often have non-standard formats
-            const cleanDateStr = pubDateStr.replace(/[A-Za-z]{3},\s/, '').trim();
-            pubDate = new Date(cleanDateStr);
+        // Check if the date string contains timezone information
+        const hasTimezone = /([+-]\d{4}|GMT|UTC|[A-Z]{3,4})/.test(pubDateStr);
 
+        if (hasTimezone) {
+            // Parse with timezone preserved
+            pubDate = new Date(pubDateStr);
+            // Store the original timezone offset in minutes
+            originalTimezoneOffset = pubDate.getTimezoneOffset();
+        } else {
+            // If no timezone info, try parsing as UTC to preserve the exact time
+            // First, try standard format
+            pubDate = new Date(pubDateStr);
+
+            // If invalid, try cleaning the string
             if (isNaN(pubDate.getTime())) {
-                return "Unknown date";
+                const cleanDateStr = pubDateStr.replace(/[A-Za-z]{3},\s/, '').trim();
+                pubDate = new Date(cleanDateStr);
+
+                if (isNaN(pubDate.getTime())) {
+                    return "Unknown date";
+                }
             }
+
+            // Assume the date is in UTC if not specified
+            originalTimezoneOffset = 0; // UTC has 0 offset
         }
 
-        // For debugging - log parsed date and current time
-        // console.log("Parsed pubDate:", pubDate);
-        // console.log("Current time:", new Date());
-
-        // For dates older than a week, return the formatted date
+        // Get current time in the same timezone as the publication date
         const now = new Date();
-        const diffDays = Math.floor((now.getTime() - pubDate.getTime()) / (1000 * 60 * 60 * 24));
+        let timeDiff: number;
+
+        if (originalTimezoneOffset !== null) {
+            // Adjust the time difference calculation to account for timezone differences
+            // by ensuring both times are compared in the same timezone
+            const pubDateMs = pubDate.getTime();
+            const nowMs = now.getTime();
+            timeDiff = nowMs - pubDateMs;
+        } else {
+            // Fallback to simple difference if we couldn't determine timezone
+            timeDiff = now.getTime() - pubDate.getTime();
+        }
+
+        // Calculate the difference in days
+        const diffDays = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
 
         if (diffDays > 6) {
-            return pubDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            // For dates older than a week, use a timezone-aware date formatter
+            // Use the Intl.DateTimeFormat for better timezone handling
+            return new Intl.DateTimeFormat('en-US', {
+                month: 'short',
+                day: 'numeric',
+                timeZone: hasTimezone ? undefined : 'UTC' // Use UTC if original had no timezone
+            }).format(pubDate);
         }
 
-        // Calculate manually for more accurate relative time
-        const timeDiff = now.getTime() - pubDate.getTime();
+        // Calculate relative time
         const minutes = Math.floor(timeDiff / (1000 * 60));
         const hours = Math.floor(minutes / 60);
 
         if (hours > 0) {
-            return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+            return hours === 1 ? '1h' : `${hours}h`;
         } else if (minutes > 0) {
             return minutes === 1 ? '1m' : `${minutes}m`;
         } else {
@@ -65,13 +109,14 @@ function formatTimeAgo(pubDateStr: string): string {
     }
 }
 
+
 const ITEMS_PER_PAGE = 20; // Number of items to load at a time
 
 const Banner = () => {
     return (
-        <div className="bg-blue-600 text-white p-4 flex items-center justify-start">
-            <img src="logo.png" alt="Logo" className="h-8 md:h-12 mr-4" />
-            <div className="flex flex-col ml-auto text-right">
+        <div className="bg-gray-950 text-white p-2.5 flex items-center justify-between md:justify-start">
+            <img src="logo2.png" alt="Logo" className="h-11 md:h-14 mr-4" />
+            <div className="flex flex-col text-right md:text-left md:ml-0">
                 <h1 className="text-lg md:text-2xl font-bold">Welcome to NOOSEFeed</h1>
                 <h2 className="text-xs md:text-sm font-bold">no app, no paywalls, no algorithms... just news</h2>
             </div>
@@ -107,21 +152,27 @@ const FeedItemComponent = ({ title, description, source, category, pubDate, imag
         .replace(/<\/p><p>/g, ". ")
         .replace(/<\/?[^>]+(>|$)/g, "")
         .replace(/\.{2,}/g, ".")
-        .replace("&#8217;", "'")
-        .replace("&#8212;", "-")
-        .replace("&#8230;", "...")
+        .replace(/&#8217;/g, "'")
+        .replace(/&#8212;/g, "-")
+        .replace(/&#8230;/g, "...")
+        .replace(/&#8220;/g, "\"")
+        .replace(/&#8221;/g, "\"")
         .trim();
 
-    const truncatedDescription = cleanDescription.length > 70
+    const truncatedDescription = cleanDescription.length
         ? cleanDescription.substring(0, 40) + "..."
+        : cleanDescription;
+
+    const truncatedDescriptionLong = cleanDescription.length
+        ? cleanDescription.substring(0, 900) + "..."
         : cleanDescription;
 
     // Format timeAgo here
     const timeAgo = pubDate ? formatTimeAgo(pubDate) : "Unknown";
 
     return (
-        <div className="bg-gray-800 p-2 md:p-4 rounded-lg shadow-md hover:shadow-xl transition-shadow w-full h-24 md:h-44">
-            <Link to={`/articles/${slug}`} className="flex flex-row gap-2 md:gap-4 hover:no-underline h-full">
+        <Link to={`/articles/${slug}`} className="bg-gray-900 p-2 md:p-4 rounded-lg shadow-md hover:shadow-xl transition-shadow w-full h-24 md:h-44">
+            <div className="flex flex-row gap-2 md:gap-4 hover:no-underline h-full">
                 {/* Image container with fixed size */}
                 <div className="flex-shrink-0 w-20 h-20 md:w-36 md:h-36 self-start" style={{ marginTop: "0.25rem" }}>
                     {imageUrl ? (
@@ -137,24 +188,24 @@ const FeedItemComponent = ({ title, description, source, category, pubDate, imag
                         </div>
                     )}
                 </div>
-                {/* Content container with fixed layout */}
-                <div className="flex-grow flex flex-col justify-between h-full overflow-hidden">
-                    <div className="overflow-hidden">
+                {/* Content container with flex layout to push footer to bottom */}
+                <div className="flex-grow flex flex-col h-full overflow-hidden">
+                    <div className="overflow-hidden flex-grow">
                         <h3 className="font-semibold text-sm md:text-lg text-white mb-1 md:mb-2">
                             {title}
                         </h3>
                         {/* Different description handling for mobile vs desktop */}
                         <p className="text-xs text-gray-300">
                             <span className="block md:hidden line-clamp-1">{truncatedDescription}</span>
-                            <span className="hidden md:block overflow-auto max-h-20">{cleanDescription}</span>
+                            <span className="hidden md:block overflow-auto max-h-20">{truncatedDescriptionLong}</span>
                         </p>
                     </div>
                     <div className="text-xs text-gray-500 italic mt-auto">
                         <p>{category} | {source} | {timeAgo}</p>
                     </div>
                 </div>
-            </Link>
-        </div>
+            </div>
+        </Link>
     );
 };
 
@@ -166,6 +217,7 @@ function App() {
     const [scrollPositions, setScrollPositions] = useState<{ [key: string]: number }>({});
     const [initialHomeRender, setInitialHomeRender] = useState(true);
     const [contentVisible, setContentVisible] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const location = useLocation();
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
@@ -197,6 +249,9 @@ function App() {
     }, [location.pathname, visibleFeedItems]);
 
     useEffect(() => {
+        // Start with loading state
+        setIsLoading(true);
+
         // Check if the app is running locally or in production
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
@@ -212,13 +267,16 @@ function App() {
             .then((response) => response.json())
             .then((data) => {
                 let feedItemsArray: FeedItem[] = [];
-                let pendingImageFetches: Promise<void>[] = [];
+                let pendingFeedFetches: Promise<void>[] = [];
+                const pendingImageFetches: Promise<void>[] = [];
 
                 data.forEach((category: { category: string; feeds: Feed[] }) => {
                     category.feeds.forEach((feed: Feed) => {
                         const feedUrl = feed.link;
                         const proxiedUrl = `${proxyBaseUrl}/${feedUrl}`;
-                        fetch(proxiedUrl)
+
+                        // Create promises for each feed fetch
+                        const feedFetchPromise = fetch(proxiedUrl)
                             .then((response) => response.text())
                             .then((xmlData) => {
                                 const parser = new DOMParser();
@@ -260,27 +318,48 @@ function App() {
                                         pendingImageFetches.push(imagePromise);
                                     }
                                 });
-
-                                // Wait for all image fetches to complete before updating state
-                                Promise.allSettled(pendingImageFetches).then(() => {
-                                    // Sort by date if needed (most recent first)
-                                    feedItemsArray.sort((a, b) => {
-                                        const dateA = new Date(a.pubDate);
-                                        const dateB = new Date(b.pubDate);
-                                        return dateB.getTime() - dateA.getTime();
-                                    });
-
-                                    setAllFeedItems(feedItemsArray);
-                                    setVisibleFeedItems(feedItemsArray.slice(0, ITEMS_PER_PAGE));
-                                    setLoadedItems(ITEMS_PER_PAGE);
-                                });
                             })
                             .catch((error) => console.error("Error loading RSS feed:", error));
+
+                        pendingFeedFetches.push(feedFetchPromise);
                     });
                 });
-            })
-            .catch((error) => console.error("Error loading feeds:", error));
 
+                // Wait for all feed fetches to complete before updating state
+                Promise.all(pendingFeedFetches)
+                    .then(() => {
+                        // Sort by date if needed (most recent first)
+                        feedItemsArray.sort((a, b) => {
+                            const dateA = new Date(a.pubDate);
+                            const dateB = new Date(b.pubDate);
+                            return dateB.getTime() - dateA.getTime();
+                        });
+
+                        setAllFeedItems(feedItemsArray);
+                        setVisibleFeedItems(feedItemsArray.slice(0, ITEMS_PER_PAGE));
+                        setLoadedItems(ITEMS_PER_PAGE);
+
+                        // Hide loading spinner once feeds are loaded and sorted
+                        setIsLoading(false);
+                        setContentVisible(true);
+
+                        // Image fetches continue in the background
+                        Promise.allSettled(pendingImageFetches)
+                            .then(() => {
+                                // This is just to ensure all image fetches complete, but we don't need to wait for them
+                                // Force a re-render to update images that have loaded
+                                setAllFeedItems([...feedItemsArray]);
+                            });
+                    })
+                    .catch((error) => {
+                        console.error("Error processing feeds:", error);
+                        setIsLoading(false); // Make sure to hide loading on error
+                    });
+            })
+            .catch((error) => {
+                console.error("Error loading feeds:", error);
+                setIsLoading(false); // Make sure to hide loading on error
+            });
     }, []);
 
     // Function to load more items when scrolled to bottom
@@ -291,7 +370,6 @@ function App() {
     };
 
     // Scroll event listener to trigger `loadMoreItems`
-    // Modify your scroll handling effect
     useEffect(() => {
         //console.log("Current path:", location.pathname);
 
@@ -309,6 +387,7 @@ function App() {
                     window.scrollTo(0, savedPosition);
 
                     setTimeout(() => {
+
                         setContentVisible(true);
                     }, 50);
                 }, 10);
@@ -358,12 +437,15 @@ function App() {
         };
     }, [loadedItems, allFeedItems]);
 
-    return (
+   return (
         <div className="flex flex-col min-h-screen">
+            {/* Full-screen loading overlay */}
+            {isLoading && <LoadingSpinner fullscreen={true} />}
+            
             <Banner />
             <Routes>
                 <Route path="/" element={
-                    <div className="bg-gray-900 p-0 md:p-6 min-h-screen w-full">
+                    <div className="bg-gray-800 p-0 md:p-6 min-h-screen w-full">
                         {/* Main content */}
                         <div className={`grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-0 md:gap-6 ${contentVisible ? '' : 'opacity-0'}`}
                             style={{ transition: "opacity 0.2s ease-in-out" }}>
@@ -371,9 +453,9 @@ function App() {
                                 <FeedItemComponent key={index} {...item} />
                             ))}
                         </div>
-
-                        {/* Loading spinner - shown when there are more items to load */}
-                        {loadedItems < allFeedItems.length && (
+                        
+                        {/* Loading spinner for infinite scroll - shown when there are more items to load */}
+                        {!isLoading && loadedItems < allFeedItems.length && (
                             <LoadingSpinner />
                         )}
                     </div>
