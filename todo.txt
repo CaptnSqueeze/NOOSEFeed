@@ -12,14 +12,26 @@
 	> function to cut the description or to fit it inside a box
 	> log unique visitors (IP, date, time, user agent)
 	> function to scrape / display the full article text from the ArticlePage
+	> about, sources page
+	> darken post when its been clicked already
+	> (mobile) Burger menu / banner pinned to top
+	> (mobile) thin row under burger menu with refresh button
+	> fix time on ArticlePage to be in the user's timezone
 
 > features to implement:
 	> fix Git repo and instructions to run locally / contribute
 	> filter by source, filter by category
 	> login / register / save preferences
-	
+	> customize sources, maybe toggle on "sources" page
+	> configure proxy server to run on server restart
+	> fix flickering when back to main feed
+	> collapsible categories on sources page
+	> selectable categories and sources
+
+
 > broken:
-	> fix time on ArticlePage to be in the user's timezone
+	> longer loading time now.. is it waiting for everything to be loaded to not display the spinner anymore?
+
 
 push build to server:
 unix cli:	sudo chown -R jacques:jacques /var/www/html
@@ -34,3 +46,4 @@ to detach from the session:
 	Ctrl+b, then d 
 to check on it: 
 	tmux attach -t proxy-server
+

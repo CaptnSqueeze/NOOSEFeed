@@ -1,33 +1,128 @@
 // App.tsx - fixed implementation
 
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import ArticlePage from "./ArticlePage.tsx";
 import './index.css';
 import { getBestImageForFeedItem } from './ImageExtractor';
 import VisitorLogger from './components/VisitorLogger';
+import Sidebar from './components/Navigation/Sidebar';
+import BurgerButton from './components/Navigation/BurgerButton';
+import AboutPage from './pages/AboutPage';
+import SourcesPage from './pages/SourcesPage';
+import './App.css';
 
+const fetchFeeds = async () => {
+    try {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const proxyBaseUrl = isLocal
+            ? `https://cors-anywhere.herokuapp.com`
+            : `https://${window.location.hostname}${window.location.port ? `:${window.location.port}` : ':3000'}/proxy`;
 
-// Enhanced LoadingSpinner with fullscreen overlay option
-const LoadingSpinner = ({ fullscreen = false }) => {
-    if (fullscreen) {
-        return (
-            <div className="fixed inset-0 bg-gray-900 bg-opacity-80 flex justify-center items-center z-50">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
-                    <p className="text-white mt-4 font-semibold">Loading NOOSEFeed...</p>
-                </div>
-            </div>
-        );
+        const response = await fetch("/default-feeds.json");
+        const data = await response.json();
+
+        let feedItemsArray: FeedItem[] = [];
+        let pendingFeedFetches: Promise<void>[] = [];
+        const pendingImageFetches: Promise<void>[] = [];
+
+        data.forEach((category: { category: string; feeds: Feed[] }) => {
+            category.feeds.forEach((feed: Feed) => {
+                const proxiedUrl = `${proxyBaseUrl}/${feed.link}`;
+
+                const feedFetchPromise = fetch(proxiedUrl)
+                    .then((response) => response.text())
+                    .then((xmlData) => {
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(xmlData, "application/xml");
+                        const items = xmlDoc.querySelectorAll("item");
+
+                        items.forEach((item) => {
+                            const title = item.querySelector("title")?.textContent;
+                            const link = item.querySelector("link")?.textContent;
+                            const description = item.querySelector("description")?.textContent;
+                            const pubDate = item.querySelector("pubDate")?.textContent;
+
+                            if (title && link && description && pubDate) {
+                                const feedItem: FeedItem = {
+                                    title,
+                                    link,
+                                    description,
+                                    source: feed.title,
+                                    category: category.category,
+                                    pubDate: pubDate,
+                                    timeAgo: formatTimeAgo(pubDate),
+                                    imageUrl: null,
+                                };
+
+                                feedItemsArray.push(feedItem);
+
+                                const imagePromise = getBestImageForFeedItem(item, feed.title, true)
+                                    .then(imageUrl => {
+                                        feedItem.imageUrl = imageUrl;
+                                    })
+                                    .catch(error => {
+                                        console.error(`Error getting image for ${title}:`, error);
+                                    });
+
+                                pendingImageFetches.push(imagePromise);
+                            }
+                        });
+                    })
+                    .catch((error) => console.error("Error loading RSS feed:", error));
+
+                pendingFeedFetches.push(feedFetchPromise);
+            });
+        });
+
+        await Promise.all(pendingFeedFetches);
+
+        feedItemsArray.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+
+        await Promise.allSettled(pendingImageFetches);
+        return feedItemsArray;
+    } catch (error) {
+        console.error("Error loading feeds:", error);
+        throw error;
     }
+};
 
+
+const isArticleVisited = (slug: string) => {
+    try {
+        const visitedArticles = JSON.parse(localStorage.getItem('visitedArticles') || '[]');
+        return visitedArticles.includes(slug);
+    } catch (e) {
+        return false;
+    }
+};
+
+// Add this function to mark an article as visited
+const markArticleVisited = (slug: string) => {
+    try {
+        const visitedArticles = JSON.parse(localStorage.getItem('visitedArticles') || '[]');
+        if (!visitedArticles.includes(slug)) {
+            visitedArticles.push(slug);
+            localStorage.setItem('visitedArticles', JSON.stringify(visitedArticles));
+        }
+    } catch (e) {
+        console.error("Error marking article as visited:", e);
+    }
+};
+
+const LoadingSpinner = () => {
     return (
-        <div className="flex justify-center items-center p-4 bg-gray-900 w-full">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="bg-gray-900 bg-opacity-80 flex justify-center items-center h-full w-full">
+            <div className="text-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
+                <p className="text-white mt-4 font-semibold">Loading NOOSEFeed... Hang in there</p>
+            </div>
         </div>
     );
 };
+
+
 
 function formatTimeAgo(pubDateStr: string): string {
     try {
@@ -113,14 +208,98 @@ function formatTimeAgo(pubDateStr: string): string {
 
 const ITEMS_PER_PAGE = 20; // Number of items to load at a time
 
-const Banner = () => {
+// Define the prop types for the Banner component
+interface BannerProps {
+    toggleSidebar: () => void;  // Function that doesn't return anything
+    isSidebarOpen: boolean;     // Boolean flag
+}
+
+const Banner = ({ toggleSidebar, isSidebarOpen }: BannerProps) => {
     return (
-        <div className="bg-blue-900 text-white p-2.5 flex items-center justify-between md:justify-start">
-            <img src="logo2.png" alt="Logo" className="h-11 md:h-14 mr-4" />
-            <div className="flex flex-col text-right md:text-left md:ml-0">
-                <h1 className="text-lg md:text-2xl font-bold">Welcome to NOOSEFeed</h1>
-                <h2 className="text-xs md:text-sm font-bold">no app, no paywalls, no algorithms... just news</h2>
+        <div className="fixed top-0 left-0 right-0 bg-blue-900 text-white p-2.5 flex z-50">
+            <div className="flex items-center w-full justify-between">
+                {/* Burger button on mobile, Logo on desktop */}
+                <div className="flex items-center">
+                    <div className="md:hidden">
+                        <BurgerButton isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+                    </div>
+                    <img src="logo2.png" alt="Logo" className="hidden md:block h-11 md:h-14" />
+                </div>
+                
+                {/* Text - right on mobile, left on desktop */}
+                <div className="flex flex-col text-right md:text-left flex-grow px-2 md:px-4 md:ml-4">
+                    <h1 className="text-lg md:text-2xl font-bold">NOOSEFeed</h1>
+                    <h2 className="text-xs md:text-sm font-bold">no paywalls, no algorithms... just news</h2>
+                </div>
+                
+                {/* Logo on mobile, Burger on desktop */}
+                <div className="flex items-center">
+                    <img src="logo2.png" alt="Logo" className="md:hidden h-11 ml-2" />
+                    <div className="hidden md:block">
+                        <BurgerButton isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+                    </div>
+                </div>
             </div>
+        </div>
+    );
+};
+
+
+const SubBanner = ({ refreshFeed }: { refreshFeed: () => void }) => { 
+    // State to track the last refresh time
+    const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
+    const [refreshTimeDisplay, setRefreshTimeDisplay] = useState("Just now");
+
+    // Function to update the time display
+    const updateTimeDisplay = useCallback(() => {
+        const now: number = Date.now();
+        const diffMs: number = now - lastRefreshTime;
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+
+        if (diffMins < 1) {
+            setRefreshTimeDisplay("Just now");
+        } else if (diffMins === 1) {
+            setRefreshTimeDisplay("1 min ago");
+        } else if (diffMins < 60) {
+            setRefreshTimeDisplay(`${diffMins} mins ago`);
+        } else {
+            const hours = Math.floor(diffMins / 60);
+            if (hours === 1) {
+                setRefreshTimeDisplay("1 hour ago");
+            } else {
+                setRefreshTimeDisplay(`${hours} hours ago`);
+            }
+        }
+    }, [lastRefreshTime]);
+
+    // Update the time display every minute
+    useEffect(() => {
+        updateTimeDisplay();
+        const intervalId = setInterval(updateTimeDisplay, 60000);
+        return () => clearInterval(intervalId);
+    }, [updateTimeDisplay]);
+
+    // Wrapper for the refresh function
+    const handleRefresh = () => {
+        refreshFeed();
+        setLastRefreshTime(Date.now());
+        setRefreshTimeDisplay("Just now");
+    };
+
+    return (
+        <div className="sub-banner w-full text-white p-1.5 flex items-center justify-between z-10 relative">
+            <div className="text-xs md:text-sm font-medium ml-3">
+                <span className="opacity-75">refreshed {refreshTimeDisplay}</span>
+            </div>
+            <button
+                onClick={handleRefresh}
+                className="bg-blue-700 hover:bg-blue-600 text-white text-xs md:text-sm px-2 py-1 rounded-md flex items-center mr-1 md:translate-y-0.1 translate-y-0.5"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15 " />
+                </svg>
+                Refresh Feed
+            </button>
         </div>
     );
 };
@@ -144,8 +323,10 @@ export interface FeedItem {
     imageUrl?: string | null;
 }
 
+// Update the FeedItemComponent to apply the visited class
 const FeedItemComponent = ({ title, description, source, category, pubDate, imageUrl }: FeedItem) => {
     const slug = slugify(title);
+    const visited = isArticleVisited(slug);
 
     // clean the description by removing html tags, etc
     const cleanDescription = description
@@ -158,6 +339,10 @@ const FeedItemComponent = ({ title, description, source, category, pubDate, imag
         .replace(/&#8230;/g, "...")
         .replace(/&#8220;/g, "\"")
         .replace(/&#8221;/g, "\"")
+        .replace(/&#038;/g, "&")
+        .replace(/&#039;/g, "'")
+        .replace(/&nbsp;/g, "'")
+        .replace(/&#38;/g, "&")
         .trim();
 
     const truncatedDescription = cleanDescription.length
@@ -171,8 +356,17 @@ const FeedItemComponent = ({ title, description, source, category, pubDate, imag
     // Format timeAgo here
     const timeAgo = pubDate ? formatTimeAgo(pubDate) : "Unknown";
 
+    // Handle the click event to mark as visited
+    const handleClick = () => {
+        markArticleVisited(slug);
+    };
+
     return (
-        <Link to={`/articles/${slug}`} className="bg-gray-900 p-2 md:p-4 rounded-lg shadow-md hover:shadow-xl transition-shadow w-full h-24 md:h-44">
+        <Link
+            to={`/articles/${slug}`}
+            className={`bg-gray-900 p-2 md:p-4 rounded-lg shadow-md hover:shadow-xl transition-shadow w-full h-24 md:h-44 ${visited ? 'opacity-70' : ''}`}
+            onClick={handleClick}
+        >
             <div className="flex flex-row gap-2 md:gap-4 hover:no-underline h-full">
                 {/* Image container with fixed size */}
                 <div className="flex-shrink-0 w-20 h-20 md:w-36 md:h-36 self-start" style={{ marginTop: "0.25rem" }}>
@@ -180,7 +374,7 @@ const FeedItemComponent = ({ title, description, source, category, pubDate, imag
                         <img
                             src={imageUrl}
                             alt={title}
-                            className="w-full h-full object-cover rounded"
+                            className={`w-full h-full object-cover rounded ${visited ? 'brightness-75' : ''}`}
                             onError={(e) => (e.currentTarget.style.display = 'none')}
                         />
                     ) : (
@@ -189,20 +383,31 @@ const FeedItemComponent = ({ title, description, source, category, pubDate, imag
                         </div>
                     )}
                 </div>
-                {/* Content container with flex layout to push footer to bottom */}
-                <div className="flex-grow flex flex-col h-full overflow-hidden">
-                    <div className="overflow-hidden flex-grow">
-                        <h3 className="font-semibold text-sm md:text-lg text-white mb-1 md:mb-2">
+
+                {/* Content container */}
+                <div className="flex-grow flex flex-col h-full relative">
+                    {/* Title area with ellipsis */}
+                    <div className="mb-1 md:mb-2">
+                        <h3 className={`font-semibold text-sm md:text-lg text-white line-clamp-2 ${visited ? 'text-gray-400' : ''}`}>
                             {title}
                         </h3>
-                        {/* Different description handling for mobile vs desktop */}
-                        <p className="text-xs text-gray-300">
-                            <span className="block md:hidden line-clamp-1">{truncatedDescription}</span>
-                            <span className="hidden md:block overflow-auto max-h-20">{truncatedDescriptionLong}</span>
-                        </p>
                     </div>
-                    <div className="text-xs text-gray-500 italic mt-auto">
-                        <p>{category} | {source} | {timeAgo}</p>
+
+                    {/* Rest of the component remains the same */}
+                    <div className="flex-grow relative overflow-hidden">
+                        <p className={`text-xs ${visited ? 'text-gray-500' : 'text-gray-300'}`}>
+                            {cleanDescription}
+                        </p>
+
+                        <div className="absolute inset-0 pointer-events-none"
+                            style={{
+                                background: `linear-gradient(to bottom, rgba(17, 24, 39, 0) 70%, rgba(17, 24, 39, 0.7) 85%, rgba(17, 24, 39, 1) 95%)`
+                            }}>
+                        </div>
+                    </div>
+
+                    <div className="text-xs text-gray-500 italic bg-gray-900 z-10">
+                        <p className="truncate">{category} | {source} | {timeAgo}</p>
                     </div>
                 </div>
             </div>
@@ -219,11 +424,47 @@ function App() {
     const [initialHomeRender, setInitialHomeRender] = useState(true);
     const [contentVisible, setContentVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const location = useLocation();
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-    // Add this ref to track if we've already scrolled for the current article page view
     const hasScrolledToTop = useRef(false);
+
+    // Toggle sidebar function
+    const toggleSidebar = () => {
+        setIsSidebarOpen(!isSidebarOpen);
+    };
+
+    const refreshFeed = () => {
+        // Reset visible items to empty first to shrink the page height
+        setVisibleFeedItems([]);
+
+        // Reset loaded items count
+        setLoadedItems(0);
+
+        // Reset scroll position to top
+        window.scrollTo({
+            top: 0,
+            behavior: 'instant' // Use instant for immediate effect
+        });
+
+        setIsLoading(true); // Set loading state to true
+
+        return fetchFeeds()
+            .then((feedItems) => {
+                setAllFeedItems(feedItems);
+                setVisibleFeedItems(feedItems.slice(0, ITEMS_PER_PAGE));
+                setLoadedItems(ITEMS_PER_PAGE);
+                setIsLoading(false);
+            })
+            .catch(() => setIsLoading(false));
+    };
+
+    // Close sidebar when changing routes on mobile
+    useEffect(() => {
+        if (window.innerWidth < 768) {
+            setIsSidebarOpen(false);
+        }
+    }, [location.pathname]);
 
     // Save scroll position when navigating away
     useEffect(() => {
@@ -250,118 +491,19 @@ function App() {
     }, [location.pathname, visibleFeedItems]);
 
     useEffect(() => {
-        // Start with loading state
         setIsLoading(true);
 
-        // Check if the app is running locally or in production
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-        let proxyBaseUrl: string;
-        if (isLocal) {
-            proxyBaseUrl = `https://cors-anywhere.herokuapp.com`; // Local proxy for local development
-        } else {
-            const port = window.location.port ? `:${window.location.port}` : ':3000'; // Ensure correct port
-            proxyBaseUrl = `https://${window.location.hostname}${port}/proxy`; // Production proxy URL
-        }
-
-        fetch("/default-feeds.json")
-            .then((response) => response.json())
-            .then((data) => {
-                let feedItemsArray: FeedItem[] = [];
-                let pendingFeedFetches: Promise<void>[] = [];
-                const pendingImageFetches: Promise<void>[] = [];
-
-                data.forEach((category: { category: string; feeds: Feed[] }) => {
-                    category.feeds.forEach((feed: Feed) => {
-                        const feedUrl = feed.link;
-                        const proxiedUrl = `${proxyBaseUrl}/${feedUrl}`;
-
-                        // Create promises for each feed fetch
-                        const feedFetchPromise = fetch(proxiedUrl)
-                            .then((response) => response.text())
-                            .then((xmlData) => {
-                                const parser = new DOMParser();
-                                const xmlDoc = parser.parseFromString(xmlData, "application/xml");
-                                const items = xmlDoc.querySelectorAll("item");
-
-                                items.forEach((item) => {
-                                    const title = item.querySelector("title")?.textContent;
-                                    const link = item.querySelector("link")?.textContent;
-                                    const description = item.querySelector("description")?.textContent;
-                                    const pubDate = item.querySelector("pubDate")?.textContent;
-
-                                    if (title && link && description && pubDate) {
-                                        // Create a feed item without an image initially
-                                        const feedItem: FeedItem = {
-                                            title,
-                                            link,
-                                            description,
-                                            source: feed.title,
-                                            category: category.category,
-                                            pubDate: pubDate,
-                                            timeAgo: formatTimeAgo(pubDate),
-                                            imageUrl: null, // Will be populated later
-                                        };
-
-                                        // Add to array immediately (without image)
-                                        feedItemsArray.push(feedItem);
-
-                                        // Create a promise to fetch the image
-                                        const imagePromise = getBestImageForFeedItem(item, feed.title, true)
-                                            .then(imageUrl => {
-                                                // Update the feed item with the image URL
-                                                feedItem.imageUrl = imageUrl;
-                                            })
-                                            .catch(error => {
-                                                console.error(`Error getting image for ${title}:`, error);
-                                            });
-
-                                        pendingImageFetches.push(imagePromise);
-                                    }
-                                });
-                            })
-                            .catch((error) => console.error("Error loading RSS feed:", error));
-
-                        pendingFeedFetches.push(feedFetchPromise);
-                    });
-                });
-
-                // Wait for all feed fetches to complete before updating state
-                Promise.all(pendingFeedFetches)
-                    .then(() => {
-                        // Sort by date if needed (most recent first)
-                        feedItemsArray.sort((a, b) => {
-                            const dateA = new Date(a.pubDate);
-                            const dateB = new Date(b.pubDate);
-                            return dateB.getTime() - dateA.getTime();
-                        });
-
-                        setAllFeedItems(feedItemsArray);
-                        setVisibleFeedItems(feedItemsArray.slice(0, ITEMS_PER_PAGE));
-                        setLoadedItems(ITEMS_PER_PAGE);
-
-                        // Hide loading spinner once feeds are loaded and sorted
-                        setIsLoading(false);
-                        setContentVisible(true);
-
-                        // Image fetches continue in the background
-                        Promise.allSettled(pendingImageFetches)
-                            .then(() => {
-                                // This is just to ensure all image fetches complete, but we don't need to wait for them
-                                // Force a re-render to update images that have loaded
-                                setAllFeedItems([...feedItemsArray]);
-                            });
-                    })
-                    .catch((error) => {
-                        console.error("Error processing feeds:", error);
-                        setIsLoading(false); // Make sure to hide loading on error
-                    });
+        fetchFeeds()
+            .then((feedItems) => {
+                setAllFeedItems(feedItems);
+                setVisibleFeedItems(feedItems.slice(0, ITEMS_PER_PAGE));
+                setLoadedItems(ITEMS_PER_PAGE);
+                setIsLoading(false);
+                setContentVisible(true);
             })
-            .catch((error) => {
-                console.error("Error loading feeds:", error);
-                setIsLoading(false); // Make sure to hide loading on error
-            });
+            .catch(() => setIsLoading(false)); // Ensure loading state is reset even on failure
     }, []);
+
 
     // Function to load more items when scrolled to bottom
     const loadMoreItems = () => {
@@ -438,34 +580,64 @@ function App() {
         };
     }, [loadedItems, allFeedItems]);
 
-   return (
+    return (
         <div className="flex flex-col min-h-screen">
-        <VisitorLogger />
-            {/* Full-screen loading overlay */}
-            {isLoading && <LoadingSpinner fullscreen={true} />}
-            
-            <Banner />
-            <Routes>
-                <Route path="/" element={
-                    <div className="bg-gray-800 p-0 md:p-6 min-h-screen w-full">
-                        {/* Main content */}
-                        <div className={`grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-0 md:gap-6 ${contentVisible ? '' : 'opacity-0'}`}
-                            style={{ transition: "opacity 0.2s ease-in-out" }}>
-                            {visibleFeedItems.map((item, index) => (
-                                <FeedItemComponent key={index} {...item} />
-                            ))}
-                        </div>
-                        
-                        {/* Loading spinner for infinite scroll - shown when there are more items to load */}
-                        {!isLoading && loadedItems < allFeedItems.length && (
+            <VisitorLogger />
+
+            {/* Fixed Banner */}
+            <Banner toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
+            <SubBanner refreshFeed={refreshFeed} />
+
+            {/* Spacer div to account for the fixed banner's height */}
+            <div className="h-24 md:h-28"></div> {/* 6rem on mobile, 7rem on desktop */}
+
+            {/* Main content container */}
+
+
+
+            <div className="flex flex-grow">
+                {/* Sidebar */}
+                <div className={`${isSidebarOpen ? 'block' : 'hidden'} lg:block w-64 bg-gray-900 flex-shrink-0`}>
+                    <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+                </div>
+
+                {/* Main content area */}
+                <div className="flex-grow overflow-y-auto relative">
+                    {isLoading && (
+                        <div className="absolute inset-0 z-40 md:top-1">
                             <LoadingSpinner />
-                        )}
-                    </div>
-                } />
-                <Route path="/articles/:slug" element={<ArticlePage feedItems={allFeedItems} isLocal={isLocal} />} />
-            </Routes>
+                        </div>
+                    )}
+
+                    <Routes>
+                        <Route path="/" element={
+                            <div className="bg-gray-800 p-0 md:p-6 min-h-full w-full">
+                                {/* Main content */}
+                                
+                                <div className={`grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-0 md:gap-6 ${contentVisible ? '' : 'opacity-0'}`}
+                                    style={{ transition: "opacity 0.2s ease-in-out" }}>
+                                    {visibleFeedItems.map((item, index) => (
+                                        <FeedItemComponent key={index} {...item} />
+                                    ))}
+                                </div>
+                                {/* Loading spinner for infinite scroll */}
+                                {!isLoading && loadedItems < allFeedItems.length && (
+                                    <LoadingSpinner />
+                                )}
+                            </div>
+                        } />
+                        <Route path="/articles/:slug" element={<ArticlePage feedItems={allFeedItems} isLocal={isLocal} />} />
+                        <Route path="/about" element={<AboutPage />} />
+                        <Route path="/sources" element={<SourcesPage />} />
+                    </Routes>
+                </div>
+            </div>
         </div>
     );
+
+
+
+
 }
 
 export default App;

@@ -13,6 +13,35 @@ const ArticlePage = ({ feedItems, isLocal }: { feedItems: FeedItem[]; isLocal: b
     const [isLoadingFullText, setIsLoadingFullText] = useState(false);
     const [fullTextError, setFullTextError] = useState<string | null>(null);
 
+    // Add this function in your ArticlePage component
+    const formatPublishedDate = (pubDateStr: string): string => {
+        try {
+            const date = new Date(pubDateStr);
+
+            // Check if the date is valid
+            if (isNaN(date.getTime())) {
+                return pubDateStr; // Return original string if parsing fails
+            }
+
+            // Format date: "March 19, 2025 at 2:30 PM"
+            const options: Intl.DateTimeFormatOptions = {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            };
+
+            return new Intl.DateTimeFormat('en-US', options).format(date);
+        } catch (error) {
+            console.error("Error formatting published date:", error);
+            return pubDateStr; // Fallback to original string
+        }
+    };
+
+
+
     // Scroll to top when component mounts
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -318,6 +347,10 @@ const ArticlePage = ({ feedItems, isLocal }: { feedItems: FeedItem[]; isLocal: b
         .replace(/&#8230;/g, "...")
         .replace(/&#8220;/g, "\"")
         .replace(/&#8221;/g, "\"")
+        .replace(/&#038;/g, "&")
+        .replace(/&#039;/g, "'")
+        .replace(/&nbsp;/g, "'")
+        .replace(/&#38;/g, "&")
         .trim();
 
     // Use high-quality image if available, otherwise fall back to RSS image
@@ -368,7 +401,8 @@ const ArticlePage = ({ feedItems, isLocal }: { feedItems: FeedItem[]; isLocal: b
                     <h1 className="text-2xl sm:text-3xl font-bold text-white mb-4">{article.title}</h1>
 
                     <div className="mb-6 text-sm text-gray-500 italic">
-                        <p>{article.category} | {article.source} | {article.pubDate}</p>
+                        <p>{article.category} | {article.source}</p>
+                        <p className="mt-1">Published: {formatPublishedDate(article.pubDate)}</p>
                     </div>
 
                     <div className="text-gray-300 mb-8 leading-relaxed">{cleanDescription}</div>

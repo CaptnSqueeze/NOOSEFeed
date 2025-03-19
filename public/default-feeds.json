@@ -52,10 +52,6 @@
                 "link": "https://www.thestar.com/search/?f=rss&t=article&c=news/world*&l=50&s=start_time&sd=desc"
             },
             {
-                "title": "r/Worldnews",
-                "link": "https://www.reddit.com/r/worldnews/.rss"
-            },
-            {
                 "title": "New York Times",
                 "link": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
             },
@@ -70,7 +66,7 @@
         ]
     },
     {
-        "category": "Business and Economy",
+        "category": "Business/Economy",
         "feeds": [
             {
                 "title": "CNBC",
@@ -97,10 +93,6 @@
     {
         "category": "Funny",
         "feeds": [
-            {
-                "title": "XKCD",
-                "link": "https://xkcd.com/rss.xml"
-            },
             {
                 "title": "The Onion",
                 "link": "https://www.theonion.com/rss"
