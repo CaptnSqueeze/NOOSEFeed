@@ -1,4 +1,4 @@
-// App.tsx - fixed implementation
+﻿// App.tsx - fixed implementation
 
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -11,6 +11,7 @@ import Sidebar from './components/Navigation/Sidebar';
 import BurgerButton from './components/Navigation/BurgerButton';
 import AboutPage from './pages/AboutPage';
 import SourcesPage from './pages/SourcesPage';
+import SidebarOverlay from './components/Navigation/SidebarOverlay';
 import './App.css';
 
 const fetchFeeds = async () => {
@@ -25,7 +26,6 @@ const fetchFeeds = async () => {
 
         let feedItemsArray: FeedItem[] = [];
         let pendingFeedFetches: Promise<void>[] = [];
-        const pendingImageFetches: Promise<void>[] = [];
 
         data.forEach((category: { category: string; feeds: Feed[] }) => {
             category.feeds.forEach((feed: Feed) => {
@@ -58,15 +58,16 @@ const fetchFeeds = async () => {
 
                                 feedItemsArray.push(feedItem);
 
-                                const imagePromise = getBestImageForFeedItem(item, feed.title, true)
+                                // Start image extraction but don't await it
+                                getBestImageForFeedItem(item, feed.title, true)
                                     .then(imageUrl => {
                                         feedItem.imageUrl = imageUrl;
+                                        // Trigger a re-render by updating the state with the latest feed items
+                                        // We need to add this callback to update the UI when an image is loaded
                                     })
                                     .catch(error => {
                                         console.error(`Error getting image for ${title}:`, error);
                                     });
-
-                                pendingImageFetches.push(imagePromise);
                             }
                         });
                     })
@@ -76,18 +77,19 @@ const fetchFeeds = async () => {
             });
         });
 
+        // Wait for all feed fetches to complete
         await Promise.all(pendingFeedFetches);
 
+        // Sort feed items by date
         feedItemsArray.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
 
-        await Promise.allSettled(pendingImageFetches);
+        // Return feed items without waiting for images to load
         return feedItemsArray;
     } catch (error) {
         console.error("Error loading feeds:", error);
         throw error;
     }
 };
-
 
 const isArticleVisited = (slug: string) => {
     try {
@@ -225,13 +227,13 @@ const Banner = ({ toggleSidebar, isSidebarOpen }: BannerProps) => {
                     </div>
                     <img src="logo2.png" alt="Logo" className="hidden md:block h-11 md:h-14" />
                 </div>
-                
+
                 {/* Text - right on mobile, left on desktop */}
                 <div className="flex flex-col text-right md:text-left flex-grow px-2 md:px-4 md:ml-4">
                     <h1 className="text-lg md:text-2xl font-bold">NOOSEFeed</h1>
                     <h2 className="text-xs md:text-sm font-bold">no paywalls, no algorithms... just news</h2>
                 </div>
-                
+
                 {/* Logo on mobile, Burger on desktop */}
                 <div className="flex items-center">
                     <img src="logo2.png" alt="Logo" className="md:hidden h-11 ml-2" />
@@ -245,10 +247,11 @@ const Banner = ({ toggleSidebar, isSidebarOpen }: BannerProps) => {
 };
 
 
-const SubBanner = ({ refreshFeed }: { refreshFeed: () => void }) => { 
+const SubBanner = ({ refreshFeed }: { refreshFeed: () => Promise<void> }) => {
     // State to track the last refresh time
     const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
     const [refreshTimeDisplay, setRefreshTimeDisplay] = useState("Just now");
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     // Function to update the time display
     const updateTimeDisplay = useCallback(() => {
@@ -281,24 +284,42 @@ const SubBanner = ({ refreshFeed }: { refreshFeed: () => void }) => {
 
     // Wrapper for the refresh function
     const handleRefresh = () => {
-        refreshFeed();
-        setLastRefreshTime(Date.now());
-        setRefreshTimeDisplay("Just now");
+        setIsRefreshing(true);
+
+        // Call the refresh function
+        refreshFeed()
+            .then(() => {
+                setLastRefreshTime(Date.now());
+                setRefreshTimeDisplay("Just now");
+                setIsRefreshing(false);
+            })
+            .catch(() => {
+                setIsRefreshing(false);
+            });
     };
 
     return (
         <div className="sub-banner w-full text-white p-1.5 flex items-center justify-between z-10 relative">
-            <div className="text-xs md:text-sm font-medium ml-3">
-                <span className="opacity-75">refreshed {refreshTimeDisplay}</span>
+            <div className="text-xs md:text-sm font-medium ml-3 mt-1 med:mt-0 lg:mt-0">
+                <span className="opacity-75">
+                    {isRefreshing ? "Refreshing..." : `Last Refreshed: ${refreshTimeDisplay}`}
+                </span>
             </div>
             <button
                 onClick={handleRefresh}
-                className="bg-blue-700 hover:bg-blue-600 text-white text-xs md:text-sm px-2 py-1 rounded-md flex items-center mr-1 md:translate-y-0.1 translate-y-0.5"
+                disabled={isRefreshing}
+                className={`
+                    ${isRefreshing
+                        ? 'bg-blue-800 cursor-not-allowed'
+                        : 'bg-blue-700 hover:bg-blue-600'
+                    } 
+                    text-white text-xs md:text-sm px-2 py-1 rounded-md flex items-center mr-1 md:translate-y-0.1 translate-y-0.5
+                `}
             >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15 " />
                 </svg>
-                Refresh Feed
+                {isRefreshing ? "Refreshing..." : "Refresh Feed"}
             </button>
         </div>
     );
@@ -343,6 +364,7 @@ const FeedItemComponent = ({ title, description, source, category, pubDate, imag
         .replace(/&#039;/g, "'")
         .replace(/&nbsp;/g, "'")
         .replace(/&#38;/g, "&")
+        .replace(/&#8211;/g, "-")
         .trim();
 
     const truncatedDescription = cleanDescription.length
@@ -429,12 +451,33 @@ function App() {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const hasScrolledToTop = useRef(false);
 
+    // Add this function INSIDE the App component to handle image updates
+    const updateFeedItemImage = (index: number, imageUrl: string) => {
+        setAllFeedItems(prevItems => {
+            const updatedItems = [...prevItems];
+            if (updatedItems[index]) {
+                updatedItems[index] = { ...updatedItems[index], imageUrl };
+            }
+            return updatedItems;
+        });
+
+        // Also update visible items if needed
+        setVisibleFeedItems(prevItems => {
+            return prevItems.map(item => {
+                if (item === allFeedItems[index]) {
+                    return { ...item, imageUrl };
+                }
+                return item;
+            });
+        });
+    };
+
     // Toggle sidebar function
     const toggleSidebar = () => {
         setIsSidebarOpen(!isSidebarOpen);
     };
 
-    const refreshFeed = () => {
+    const refreshFeed = (): Promise<void> => {
         // Reset visible items to empty first to shrink the page height
         setVisibleFeedItems([]);
 
@@ -449,14 +492,20 @@ function App() {
 
         setIsLoading(true); // Set loading state to true
 
-        return fetchFeeds()
-            .then((feedItems) => {
-                setAllFeedItems(feedItems);
-                setVisibleFeedItems(feedItems.slice(0, ITEMS_PER_PAGE));
-                setLoadedItems(ITEMS_PER_PAGE);
-                setIsLoading(false);
-            })
-            .catch(() => setIsLoading(false));
+        return new Promise<void>((resolve, reject) => {
+            fetchFeeds()
+                .then((feedItems) => {
+                    setAllFeedItems(feedItems);
+                    setVisibleFeedItems(feedItems.slice(0, ITEMS_PER_PAGE));
+                    setLoadedItems(ITEMS_PER_PAGE);
+                    setIsLoading(false);
+                    resolve();
+                })
+                .catch((error) => {
+                    setIsLoading(false);
+                    reject(error);
+                });
+        });
     };
 
     // Close sidebar when changing routes on mobile
@@ -507,6 +556,11 @@ function App() {
 
     // Function to load more items when scrolled to bottom
     const loadMoreItems = () => {
+        if (loadedItems >= allFeedItems.length) {
+            // No more items to load
+            return;
+        }
+
         const nextItems = allFeedItems.slice(loadedItems, loadedItems + ITEMS_PER_PAGE);
         setVisibleFeedItems((prev) => [...prev, ...nextItems]);
         setLoadedItems((prev) => prev + ITEMS_PER_PAGE);
@@ -565,20 +619,38 @@ function App() {
         };
     }, [location.pathname, scrollPositions, initialHomeRender]);
 
+    const EndOfContentIndicator = () => {
+        return (
+            <div className="py-8 text-center text-gray-500 bg-gray-800">
+                <p>You've reached the end of the feed</p>
+                <button
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    className="mt-2 text-blue-400 hover:text-blue-300"
+                >
+                    ↑ Back to top
+                </button>
+            </div>
+        );
+    };
+
+    // Modify the scroll event listener for better threshold detection
     useEffect(() => {
         const handleScroll = () => {
-            if (window.innerHeight + document.documentElement.scrollTop === document.documentElement.offsetHeight) {
+            // Calculate distance from bottom more precisely
+            const scrollPosition = window.innerHeight + window.scrollY;
+            const threshold = document.documentElement.offsetHeight - 100; // 100px buffer
+
+            if (scrollPosition >= threshold && !isLoading && loadedItems < allFeedItems.length) {
                 loadMoreItems();
             }
         };
 
         window.addEventListener('scroll', handleScroll);
 
-        // Cleanup the event listener when the component is unmounted
         return () => {
             window.removeEventListener('scroll', handleScroll);
         };
-    }, [loadedItems, allFeedItems]);
+    }, [loadedItems, allFeedItems, isLoading]);
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -591,13 +663,15 @@ function App() {
             {/* Spacer div to account for the fixed banner's height */}
             <div className="h-24 md:h-28"></div> {/* 6rem on mobile, 7rem on desktop */}
 
+            <SidebarOverlay isOpen={isSidebarOpen} closeSidebar={() => setIsSidebarOpen(false)} />
+
             {/* Main content container */}
 
 
 
             <div className="flex flex-grow">
-                {/* Sidebar */}
-                <div className={`${isSidebarOpen ? 'block' : 'hidden'} lg:block w-64 bg-gray-900 flex-shrink-0`}>
+                {/* Sidebar - Update z-index to be higher than the overlay */}
+                <div className={`${isSidebarOpen ? 'block' : 'hidden'} lg:block w-64 bg-gray-900 flex-shrink-0 z-20`}>
                     <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
                 </div>
 
@@ -613,17 +687,20 @@ function App() {
                         <Route path="/" element={
                             <div className="bg-gray-800 p-0 md:p-6 min-h-full w-full">
                                 {/* Main content */}
-                                
                                 <div className={`grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-0 md:gap-6 ${contentVisible ? '' : 'opacity-0'}`}
                                     style={{ transition: "opacity 0.2s ease-in-out" }}>
                                     {visibleFeedItems.map((item, index) => (
                                         <FeedItemComponent key={index} {...item} />
                                     ))}
                                 </div>
-                                {/* Loading spinner for infinite scroll */}
-                                {!isLoading && loadedItems < allFeedItems.length && (
-                                    <LoadingSpinner />
+
+                                {/* End of content indicator */}
+                                {!isLoading && loadedItems >= allFeedItems.length && allFeedItems.length > 0 && (
+                                    <EndOfContentIndicator />
                                 )}
+
+                                {/* Add bottom padding to prevent content from appearing cut off */}
+                                <div className="h-16 md:h-8"></div>
                             </div>
                         } />
                         <Route path="/articles/:slug" element={<ArticlePage feedItems={allFeedItems} isLocal={isLocal} />} />
@@ -634,10 +711,6 @@ function App() {
             </div>
         </div>
     );
-
-
-
-
 }
 
 export default App;

@@ -15,6 +15,12 @@ const SourcesPage = () => {
     const [feedCategories, setFeedCategories] = useState<FeedCategory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+
+    useEffect(() => {
+        window.scrollTo(0, 0); // Scrolls to the top when the component mounts
+    }, []);
+
+
     useEffect(() => {
         // Fetch the default feeds
         fetch("/default-feeds.json")
@@ -58,7 +64,14 @@ const SourcesPage = () => {
                                 <h3 className="font-bold mb-2">{feed.title}</h3>
                                 <div className="flex flex-col">
                                     <span className="text-gray-400 text-xs mb-3 break-all">
-                                        {feed.link}
+                                        <a
+                                            href={feed.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-400 hover:underline"
+                                        >
+                                            {feed.link}
+                                        </a>
                                     </span>
                                 </div>
                             </div>
