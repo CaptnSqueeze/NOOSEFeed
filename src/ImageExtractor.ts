@@ -1,4 +1,4 @@
-// ComprehensiveImageExtractor.ts
+// ImageExtractor.ts
 export function extractImageFromItem(item: Element): string | null {
     let imageUrl = null;
 
@@ -184,6 +184,8 @@ export async function getBestImageForFeedItem(
 
     return imageUrl;
 }
+
+
 
 // For debugging purposes
 export function debugImageExtraction(item: Element): Record<string, string | null> {

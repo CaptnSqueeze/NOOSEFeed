@@ -11,12 +11,11 @@ const SidebarOverlay: React.FC<SidebarOverlayProps> = ({ isOpen, closeSidebar })
 
     return (
         <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden" // Hide on md (768px+) screens
+            className="fixed inset-0 w-screen h-screen bg-black bg-opacity-50 z-50 md:hidden"
             onClick={closeSidebar}
             aria-hidden="true"
         />
     );
 };
-
 
 export default SidebarOverlay;

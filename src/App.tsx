@@ -5,7 +5,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import ArticlePage from "./ArticlePage.tsx";
 import './index.css';
-import { getBestImageForFeedItem } from './ImageExtractor';
+import { getBestImageForFeedItem, extractImageFromItem } from './ImageExtractor';
 import VisitorLogger from './components/VisitorLogger';
 import Sidebar from './components/Navigation/Sidebar';
 import BurgerButton from './components/Navigation/BurgerButton';
@@ -14,7 +14,7 @@ import SourcesPage from './pages/SourcesPage';
 import SidebarOverlay from './components/Navigation/SidebarOverlay';
 import './App.css';
 
-const fetchFeeds = async () => {
+const fetchFeeds = async (onImageLoaded?: (index: number, imageUrl: string) => void) => {
     try {
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const proxyBaseUrl = isLocal
@@ -56,18 +56,35 @@ const fetchFeeds = async () => {
                                     imageUrl: null,
                                 };
 
+                                // Store the index before pushing
+                                const itemIndex = feedItemsArray.length;
                                 feedItemsArray.push(feedItem);
 
-                                // Start image extraction but don't await it
-                                getBestImageForFeedItem(item, feed.title, true)
-                                    .then(imageUrl => {
-                                        feedItem.imageUrl = imageUrl;
-                                        // Trigger a re-render by updating the state with the latest feed items
-                                        // We need to add this callback to update the UI when an image is loaded
-                                    })
-                                    .catch(error => {
-                                        console.error(`Error getting image for ${title}:`, error);
-                                    });
+                                // First try to get an image directly from the RSS item
+                                const directImageUrl = extractImageFromItem(item);
+                                if (directImageUrl) {
+                                    feedItem.imageUrl = directImageUrl;
+                                    if (onImageLoaded) {
+                                        onImageLoaded(itemIndex, directImageUrl);
+                                    }
+                                } else {
+                                    // If no direct image, asynchronously fetch from article
+                                    getBestImageForFeedItem(item, feed.title, true)
+                                        .then(imageUrl => {
+                                            if (imageUrl) {
+                                                // Update the image URL in the feed item
+                                                feedItem.imageUrl = imageUrl;
+
+                                                // Notify the caller about the image loading
+                                                if (onImageLoaded) {
+                                                    onImageLoaded(itemIndex, imageUrl);
+                                                }
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.error(`Error getting image for ${title}:`, error);
+                                        });
+                                }
                             }
                         });
                     })
@@ -225,18 +242,18 @@ const Banner = ({ toggleSidebar, isSidebarOpen }: BannerProps) => {
                     <div className="md:hidden">
                         <BurgerButton isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
                     </div>
-                    <img src="logo2.png" alt="Logo" className="hidden md:block h-11 md:h-14" />
+                    <img src="logo2.png" alt="Logo" className="hidden md:block h-11 md:h-14 scale-[1.4]" />
                 </div>
 
                 {/* Text - right on mobile, left on desktop */}
-                <div className="flex flex-col text-right md:text-left flex-grow px-2 md:px-4 md:ml-4">
+                <div className="flex flex-col text-right md:text-left flex-grow px-0 md:px-1 md:ml-0">
                     <h1 className="text-lg md:text-2xl font-bold">NOOSEFeed</h1>
                     <h2 className="text-xs md:text-sm font-bold">no paywalls, no algorithms... just news</h2>
                 </div>
 
                 {/* Logo on mobile, Burger on desktop */}
                 <div className="flex items-center">
-                    <img src="logo2.png" alt="Logo" className="md:hidden h-11 ml-2" />
+                    <img src="logo2.png" alt="Logo" className="md:hidden h-11 ml-1 scale-[1.4]" />
                     <div className="hidden md:block">
                         <BurgerButton isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
                     </div>
@@ -452,7 +469,10 @@ function App() {
     const hasScrolledToTop = useRef(false);
 
     // Add this function INSIDE the App component to handle image updates
-    const updateFeedItemImage = (index: number, imageUrl: string) => {
+    const updateFeedItemImage = (allFeedItems: FeedItem[], setAllFeedItems: React.Dispatch<React.SetStateAction<FeedItem[]>>,
+        visibleFeedItems: FeedItem[], setVisibleFeedItems: React.Dispatch<React.SetStateAction<FeedItem[]>>,
+        index: number, imageUrl: string) => {
+        // Update the all items state
         setAllFeedItems(prevItems => {
             const updatedItems = [...prevItems];
             if (updatedItems[index]) {
@@ -461,10 +481,11 @@ function App() {
             return updatedItems;
         });
 
-        // Also update visible items if needed
+        // Find the corresponding item in visibleFeedItems and update it if present
         setVisibleFeedItems(prevItems => {
             return prevItems.map(item => {
-                if (item === allFeedItems[index]) {
+                // Match by link since that should be unique
+                if (item.link === allFeedItems[index]?.link) {
                     return { ...item, imageUrl };
                 }
                 return item;
@@ -477,6 +498,7 @@ function App() {
         setIsSidebarOpen(!isSidebarOpen);
     };
 
+    // Modify refreshFeed function in App component to use the image update callback
     const refreshFeed = (): Promise<void> => {
         // Reset visible items to empty first to shrink the page height
         setVisibleFeedItems([]);
@@ -493,7 +515,10 @@ function App() {
         setIsLoading(true); // Set loading state to true
 
         return new Promise<void>((resolve, reject) => {
-            fetchFeeds()
+            fetchFeeds((index, imageUrl) => {
+                // This callback will be triggered whenever an image is loaded
+                updateFeedItemImage(allFeedItems, setAllFeedItems, visibleFeedItems, setVisibleFeedItems, index, imageUrl);
+            })
                 .then((feedItems) => {
                     setAllFeedItems(feedItems);
                     setVisibleFeedItems(feedItems.slice(0, ITEMS_PER_PAGE));
@@ -542,7 +567,10 @@ function App() {
     useEffect(() => {
         setIsLoading(true);
 
-        fetchFeeds()
+        fetchFeeds((index, imageUrl) => {
+            // This callback will be triggered whenever an image is loaded
+            updateFeedItemImage(allFeedItems, setAllFeedItems, visibleFeedItems, setVisibleFeedItems, index, imageUrl);
+        })
             .then((feedItems) => {
                 setAllFeedItems(feedItems);
                 setVisibleFeedItems(feedItems.slice(0, ITEMS_PER_PAGE));
@@ -658,6 +686,7 @@ function App() {
 
             {/* Fixed Banner */}
             <Banner toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
+
             <SubBanner refreshFeed={refreshFeed} />
 
             {/* Spacer div to account for the fixed banner's height */}
@@ -670,12 +699,17 @@ function App() {
 
 
             <div className="flex flex-grow">
-                {/* Sidebar - Update z-index to be higher than the overlay */}
-                <div className={`${isSidebarOpen ? 'block' : 'hidden'} lg:block w-64 bg-gray-900 flex-shrink-0 z-20`}>
+                {/* Sidebar - Update to use fixed positioning only on mobile */}
+                <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:hidden fixed top-24 left-0 w-64 h-full bg-gray-900 z-20`}>
                     <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
                 </div>
 
-                {/* Main content area */}
+                {/* Desktop sidebar - always visible on larger screens */}
+                <div className="hidden lg:block w-64 bg-gray-900 flex-shrink-0">
+                    <Sidebar isOpen={true} toggleSidebar={toggleSidebar} />
+                </div>
+
+                {/* Main content area - doesn't get squished on mobile */}
                 <div className="flex-grow overflow-y-auto relative">
                     {isLoading && (
                         <div className="absolute inset-0 z-40 md:top-1">
@@ -709,6 +743,7 @@ function App() {
                     </Routes>
                 </div>
             </div>
+
         </div>
     );
 }
