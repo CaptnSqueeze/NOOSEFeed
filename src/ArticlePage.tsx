@@ -192,7 +192,8 @@ const ArticlePage = ({ feedItems, isLocal }: { feedItems: FeedItem[]; isLocal: b
                         'footer',
                         '.footer',
                         '.nav',
-                        '.sidebar'
+                        '.sidebar',
+                        '.input'
                     ];
 
                     unwantedSelectors.forEach(unwanted => {
@@ -249,7 +250,7 @@ const ArticlePage = ({ feedItems, isLocal }: { feedItems: FeedItem[]; isLocal: b
                         '.toolbar', '.actions', '.utilities', '.preferences',
                         '.pagination', '.pager', '.load-more', '.next-prev',
 
-                        '.link', '.url', '.source', '.credit', '.source-link',
+                        '.link', '.url', '.source', '.credit', '.source-link', '.indput',
                     ];
 
                     elementsToRemove.forEach(selector => {
@@ -310,6 +311,9 @@ const ArticlePage = ({ feedItems, isLocal }: { feedItems: FeedItem[]; isLocal: b
         headings.forEach(heading => {
             heading.classList.add('text-white', 'font-bold', 'mb-3', 'mt-6');
         });
+
+        const inputBoxes = tempDiv.querySelectorAll('input');
+        inputBoxes.forEach(el => el.remove());
 
         return tempDiv.innerHTML;
     };

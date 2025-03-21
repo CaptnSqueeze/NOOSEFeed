@@ -1,7 +1,7 @@
 ﻿// App.tsx - fixed implementation
 
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import ArticlePage from "./ArticlePage.tsx";
 import './index.css';
@@ -226,14 +226,7 @@ function formatTimeAgo(pubDateStr: string): string {
 
 
 const ITEMS_PER_PAGE = 20; // Number of items to load at a time
-
-// Define the prop types for the Banner component
-interface BannerProps {
-    toggleSidebar: () => void;  // Function that doesn't return anything
-    isSidebarOpen: boolean;     // Boolean flag
-}
-
-const Banner = ({ toggleSidebar, isSidebarOpen }: BannerProps) => {
+const Banner = ({ toggleSidebar, isSidebarOpen }: { toggleSidebar: () => void; isSidebarOpen: boolean }) => {
     return (
         <div className="fixed top-0 left-0 right-0 bg-blue-900 text-white p-2.5 flex z-50">
             <div className="flex items-center w-full justify-between">
@@ -262,6 +255,8 @@ const Banner = ({ toggleSidebar, isSidebarOpen }: BannerProps) => {
         </div>
     );
 };
+
+
 
 
 const SubBanner = ({ refreshFeed }: { refreshFeed: () => Promise<void> }) => {
@@ -336,7 +331,7 @@ const SubBanner = ({ refreshFeed }: { refreshFeed: () => Promise<void> }) => {
                 <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15 " />
                 </svg>
-                {isRefreshing ? "Refreshing..." : "Refresh Feed"}
+                {isRefreshing ? "Refresh Feed" : "Refresh Feed"}
             </button>
         </div>
     );
@@ -364,7 +359,7 @@ export interface FeedItem {
 // Update the FeedItemComponent to apply the visited class
 const FeedItemComponent = ({ title, description, source, category, pubDate, imageUrl }: FeedItem) => {
     const slug = slugify(title);
-    const visited = isArticleVisited(slug);
+    const visited = useMemo(() => isArticleVisited(slug), [slug]);
 
     // clean the description by removing html tags, etc
     const cleanDescription = description
@@ -497,6 +492,28 @@ function App() {
     const toggleSidebar = () => {
         setIsSidebarOpen(!isSidebarOpen);
     };
+
+    // add a click delay for links when sidebar is open
+    useEffect(() => {
+        const handleLinkClicks = (e: MouseEvent) => {
+            if (isSidebarOpen && e.target instanceof HTMLAnchorElement) {
+                e.preventDefault();
+                setIsSidebarOpen(false);
+
+                // Add a small delay before navigation
+                const href = e.target.getAttribute('href');
+                setTimeout(() => {
+                    window.location.href = href || '/';
+                }, 50);
+            }
+        };
+
+        document.addEventListener('click', handleLinkClicks);
+
+        return () => {
+            document.removeEventListener('click', handleLinkClicks);
+        };
+    }, [isSidebarOpen]);
 
     // Modify refreshFeed function in App component to use the image update callback
     const refreshFeed = (): Promise<void> => {
@@ -700,7 +717,7 @@ function App() {
 
             <div className="flex flex-grow">
                 {/* Sidebar - Update to use fixed positioning only on mobile */}
-                <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:hidden fixed top-24 left-0 w-64 h-full bg-gray-900 z-20`}>
+                <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:hidden fixed top-24 left-0 w-64 h-full bg-gray-900 z-40`}>
                     <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
                 </div>
 
@@ -710,7 +727,7 @@ function App() {
                 </div>
 
                 {/* Main content area - doesn't get squished on mobile */}
-                <div className="flex-grow overflow-y-auto relative">
+                <div className={`flex-grow overflow-y-auto relative ${isSidebarOpen ? 'pointer-events-none' : ''}`}>
                     {isLoading && (
                         <div className="absolute inset-0 z-40 md:top-1">
                             <LoadingSpinner />

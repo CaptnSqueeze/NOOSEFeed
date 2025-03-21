@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { HomeIcon, InformationCircleIcon, NewspaperIcon } from '@heroicons/react/24/solid';
 
 interface SidebarProps {
@@ -8,36 +8,42 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
+    const navigate = useNavigate();
+
+    const handleNavigation = (path: string) => {
+        toggleSidebar(); // Close sidebar
+        setTimeout(() => navigate(path), 100); // Delay navigation slightly
+    };
+
     return (
         <div className="text-white h-full w-64 fixed">
             <nav className="flex-col h-full w-full">
                 <ul className="space-y-2 p-4 flex-grow">
                     <li>
-                        <Link to="/" onClick={toggleSidebar}>
+                        <button onClick={() => handleNavigation("/")} className="w-full text-left hover:bg-gray-800 active:bg-gray-700">
                             <div className="flex items-center space-x-2 p-2 rounded hover:bg-gray-800 pr-4 w-full">
                                 <HomeIcon className="h-5 w-5" />
                                 <span>Home</span>
                             </div>
-                        </Link>
+                        </button>
                     </li>
                     <li>
-                        <Link to="/about" onClick={toggleSidebar}>
+                        <button onClick={() => handleNavigation("/about")} className="w-full text-left hover:bg-gray-800 active:bg-gray-700">
                             <div className="flex items-center space-x-2 p-2 rounded hover:bg-gray-800 pr-4 w-full">
                                 <InformationCircleIcon className="h-5 w-5" />
                                 <span>About</span>
                             </div>
-                        </Link>
+                        </button>
                     </li>
                     <li>
-                        <Link to="/sources" onClick={toggleSidebar}>
+                        <button onClick={() => handleNavigation("/sources")} className="w-full text-left hover:bg-gray-800 active:bg-gray-700">
                             <div className="flex items-center space-x-2 p-2 rounded hover:bg-gray-800 pr-4 w-full">
                                 <NewspaperIcon className="h-5 w-5" />
                                 <span>News Sources</span>
                             </div>
-                        </Link>
+                        </button>
                     </li>
                 </ul>
-                <div className="flex-grow"></div>
             </nav>
         </div>
     );

@@ -8,7 +8,7 @@ const VisitorLogger = () => {
 
     useEffect(() => {
         const logVisit = async () => {
-            console.log('Attempting to log visit:', location.pathname);
+            // console.log('Attempting to log visit:', location.pathname);
             try {
                 // Use the full URL to your API
                 const response = await fetch('https://warriorlife.ca:3000/visitor-log', {
@@ -24,16 +24,16 @@ const VisitorLogger = () => {
                     }),
                 });
 
-                console.log('Log response:', response.status);
+                // console.log('Log response:', response.status);
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error('Error logging visit:', errorText);
                 } else {
                     const data = await response.json();
-                    console.log('Log successful:', data);
+                    // console.log('Log successful:', data);
                 }
             } catch (error) {
-                console.error('Failed to log visit:', error);
+                // console.error('Failed to log visit:', error);
             }
         };
 
