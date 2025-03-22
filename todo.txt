@@ -22,6 +22,8 @@
 	> say "refreshing" on refresh before saying last refresh just now
 	> longer loading time now.. is it waiting for everything to be loaded to not display the spinner anymore?
 	> content getting squished on mobile when sidebar is open - sidebar should overlay content (but just on mobile)
+	> check timing of resetting scroll before spinwheel - sometimes wheel doesnt show on mobile, when scrolled down
+	> async pic loading
 
 > features to implement:
 	> fix Git repo and instructions to run locally / contribute
@@ -34,13 +36,9 @@
 	> selectable categories and sources
 	> make it so there's no content past the content area when user scrolls past it on mobile - 
 		can still see whitespace below the banner if scroll past content at the top
-	> check timing of resetting scroll before spinwheel - sometimes wheel doesnt show on mobile, when scrolled down
+	> clean article text - remove ads, remove "read more" links, remove "share" links
+		> need function to do this with regex
 
-> broken:
-
-	> is it waiting until it has all all high res pics before displaying them? could display them as it fetches, one by one, starting from the top.
-		> some are appearing way after the page has loaded
-		> would be better to populate the pic as we fetch images, not sure what's going on there but it seems they're all loading at once and not trickling in until i change page and come back
 	
 
 

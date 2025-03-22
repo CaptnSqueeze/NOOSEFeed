@@ -11,8 +11,11 @@ const Sidebar = ({ isOpen, toggleSidebar }: SidebarProps) => {
     const navigate = useNavigate();
 
     const handleNavigation = (path: string) => {
-        toggleSidebar(); // Close sidebar
-        setTimeout(() => navigate(path), 100); // Delay navigation slightly
+        // Only toggle sidebar on mobile screens
+        if (window.innerWidth < 768) { // 768px is the standard md breakpoint in Tailwind
+            toggleSidebar();
+        }
+        setTimeout(() => navigate(path), 100);
     };
 
     return (

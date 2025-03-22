@@ -8,12 +8,19 @@ import './index.css';
 import { getBestImageForFeedItem, extractImageFromItem } from './ImageExtractor';
 import VisitorLogger from './components/VisitorLogger';
 import Sidebar from './components/Navigation/Sidebar';
-import BurgerButton from './components/Navigation/BurgerButton';
+import BurgerButton from './components/Navigation/BurgerButton.tsx';
 import AboutPage from './pages/AboutPage';
 import SourcesPage from './pages/SourcesPage';
 import SidebarOverlay from './components/Navigation/SidebarOverlay';
+import Banner from './components/Navigation/Banner.tsx';
+import SubBanner from './components/Navigation/SubBanner.tsx';
 import './App.css';
 
+
+// banner component
+const ITEMS_PER_PAGE = 20; // Number of items to load at a time
+
+// fetch feeds logic
 const fetchFeeds = async (onImageLoaded?: (index: number, imageUrl: string) => void) => {
     try {
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -108,6 +115,7 @@ const fetchFeeds = async (onImageLoaded?: (index: number, imageUrl: string) => v
     }
 };
 
+// check if article is visited
 const isArticleVisited = (slug: string) => {
     try {
         const visitedArticles = JSON.parse(localStorage.getItem('visitedArticles') || '[]');
@@ -117,7 +125,7 @@ const isArticleVisited = (slug: string) => {
     }
 };
 
-// Add this function to mark an article as visited
+// mark article as visited
 const markArticleVisited = (slug: string) => {
     try {
         const visitedArticles = JSON.parse(localStorage.getItem('visitedArticles') || '[]');
@@ -132,7 +140,7 @@ const markArticleVisited = (slug: string) => {
 
 const LoadingSpinner = () => {
     return (
-        <div className="bg-gray-900 bg-opacity-80 flex justify-center items-center h-full w-full">
+        <div className="absolute inset-0 flex justify-center items-center bg-gray-900 bg-opacity-80">
             <div className="text-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
                 <p className="text-white mt-4 font-semibold">Loading NOOSEFeed... Hang in there</p>
@@ -141,8 +149,7 @@ const LoadingSpinner = () => {
     );
 };
 
-
-
+// format time ago logic
 function formatTimeAgo(pubDateStr: string): string {
     try {
         // Print raw string for debugging
@@ -224,118 +231,6 @@ function formatTimeAgo(pubDateStr: string): string {
     }
 }
 
-
-const ITEMS_PER_PAGE = 20; // Number of items to load at a time
-const Banner = ({ toggleSidebar, isSidebarOpen }: { toggleSidebar: () => void; isSidebarOpen: boolean }) => {
-    return (
-        <div className="fixed top-0 left-0 right-0 bg-blue-900 text-white p-2.5 flex z-50">
-            <div className="flex items-center w-full justify-between">
-                {/* Burger button on mobile, Logo on desktop */}
-                <div className="flex items-center">
-                    <div className="md:hidden">
-                        <BurgerButton isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
-                    </div>
-                    <img src="logo2.png" alt="Logo" className="hidden md:block h-11 md:h-14 scale-[1.4]" />
-                </div>
-
-                {/* Text - right on mobile, left on desktop */}
-                <div className="flex flex-col text-right md:text-left flex-grow px-0 md:px-1 md:ml-0">
-                    <h1 className="text-lg md:text-2xl font-bold">NOOSEFeed</h1>
-                    <h2 className="text-xs md:text-sm font-bold">no paywalls, no algorithms... just news</h2>
-                </div>
-
-                {/* Logo on mobile, Burger on desktop */}
-                <div className="flex items-center">
-                    <img src="logo2.png" alt="Logo" className="md:hidden h-11 ml-1 scale-[1.4]" />
-                    <div className="hidden md:block">
-                        <BurgerButton isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-
-
-const SubBanner = ({ refreshFeed }: { refreshFeed: () => Promise<void> }) => {
-    // State to track the last refresh time
-    const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
-    const [refreshTimeDisplay, setRefreshTimeDisplay] = useState("Just now");
-    const [isRefreshing, setIsRefreshing] = useState(false);
-
-    // Function to update the time display
-    const updateTimeDisplay = useCallback(() => {
-        const now: number = Date.now();
-        const diffMs: number = now - lastRefreshTime;
-        const diffMins = Math.floor(diffMs / (1000 * 60));
-
-        if (diffMins < 1) {
-            setRefreshTimeDisplay("Just now");
-        } else if (diffMins === 1) {
-            setRefreshTimeDisplay("1 min ago");
-        } else if (diffMins < 60) {
-            setRefreshTimeDisplay(`${diffMins} mins ago`);
-        } else {
-            const hours = Math.floor(diffMins / 60);
-            if (hours === 1) {
-                setRefreshTimeDisplay("1 hour ago");
-            } else {
-                setRefreshTimeDisplay(`${hours} hours ago`);
-            }
-        }
-    }, [lastRefreshTime]);
-
-    // Update the time display every minute
-    useEffect(() => {
-        updateTimeDisplay();
-        const intervalId = setInterval(updateTimeDisplay, 60000);
-        return () => clearInterval(intervalId);
-    }, [updateTimeDisplay]);
-
-    // Wrapper for the refresh function
-    const handleRefresh = () => {
-        setIsRefreshing(true);
-
-        // Call the refresh function
-        refreshFeed()
-            .then(() => {
-                setLastRefreshTime(Date.now());
-                setRefreshTimeDisplay("Just now");
-                setIsRefreshing(false);
-            })
-            .catch(() => {
-                setIsRefreshing(false);
-            });
-    };
-
-    return (
-        <div className="sub-banner w-full text-white p-1.5 flex items-center justify-between z-10 relative">
-            <div className="text-xs md:text-sm font-medium ml-3 mt-1 med:mt-0 lg:mt-0">
-                <span className="opacity-75">
-                    {isRefreshing ? "Refreshing..." : `Last Refreshed: ${refreshTimeDisplay}`}
-                </span>
-            </div>
-            <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className={`
-                    ${isRefreshing
-                        ? 'bg-blue-800 cursor-not-allowed'
-                        : 'bg-blue-700 hover:bg-blue-600'
-                    } 
-                    text-white text-xs md:text-sm px-2 py-1 rounded-md flex items-center mr-1 md:translate-y-0.1 translate-y-0.5
-                `}
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15 " />
-                </svg>
-                {isRefreshing ? "Refresh Feed" : "Refresh Feed"}
-            </button>
-        </div>
-    );
-};
 
 const slugify = (text: string) =>
     text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -584,18 +479,22 @@ function App() {
     useEffect(() => {
         setIsLoading(true);
 
+        // Set scroll position before making content visible
+        window.scrollTo(0, scrollPositions['/'] || 0);
+        setContentVisible(true);
         fetchFeeds((index, imageUrl) => {
-            // This callback will be triggered whenever an image is loaded
             updateFeedItemImage(allFeedItems, setAllFeedItems, visibleFeedItems, setVisibleFeedItems, index, imageUrl);
         })
             .then((feedItems) => {
+
                 setAllFeedItems(feedItems);
                 setVisibleFeedItems(feedItems.slice(0, ITEMS_PER_PAGE));
                 setLoadedItems(ITEMS_PER_PAGE);
                 setIsLoading(false);
-                setContentVisible(true);
+
+
             })
-            .catch(() => setIsLoading(false)); // Ensure loading state is reset even on failure
+            .catch(() => setIsLoading(false));
     }, []);
 
 
@@ -613,56 +512,41 @@ function App() {
 
     // Scroll event listener to trigger `loadMoreItems`
     useEffect(() => {
-        //console.log("Current path:", location.pathname);
 
         if (location.pathname === '/') {
-            // Reset the scroll flag when going to home
             hasScrolledToTop.current = false;
 
-            // Your existing home page logic...
             if (!initialHomeRender) {
-                setContentVisible(false);
-
                 setTimeout(() => {
                     const savedPosition = scrollPositions['/'] || 0;
-                    //console.log("Restoring home scroll to:", savedPosition);
                     window.scrollTo(0, savedPosition);
-
-                    setTimeout(() => {
-
-                        setContentVisible(true);
-                    }, 50);
                 }, 10);
             } else {
+
                 setContentVisible(true);
                 setInitialHomeRender(false);
             }
         } else if (location.pathname.includes('/articles/')) {
-            // For article pages - always show content
             setContentVisible(true);
 
-            // Only scroll if we haven't already for this view
             if (!hasScrolledToTop.current) {
-                //console.log("Article page detected - forcing scroll to top with delay");
-
-                // Use a more reliable approach with RAF and timeout
                 setTimeout(() => {
                     window.scrollTo({
                         top: 0,
-                        behavior: 'instant' // Use 'instant' instead of smooth for more reliable positioning
+                        behavior: 'instant'
                     });
                     hasScrolledToTop.current = true;
                 }, 100);
             }
         }
 
-        // Cleanup function to reset the scroll flag when unmounting
         return () => {
             if (location.pathname.includes('/articles/')) {
                 hasScrolledToTop.current = false;
             }
         };
     }, [location.pathname, scrollPositions, initialHomeRender]);
+
 
     const EndOfContentIndicator = () => {
         return (
@@ -712,7 +596,6 @@ function App() {
             <SidebarOverlay isOpen={isSidebarOpen} closeSidebar={() => setIsSidebarOpen(false)} />
 
             {/* Main content container */}
-
 
 
             <div className="flex flex-grow">
